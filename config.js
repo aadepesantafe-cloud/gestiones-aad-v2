@@ -6,4 +6,4 @@
 // Tiene esta forma:
 // https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXX/exec
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcentnzzQUVGdBWcgixCCju71Q-UrDtblH-xdsde2UgtBwPZpoc6fndTPpAzhet33c/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxcentnzzQUVGdBWcgixCCju71Q-UrDtblH-xdsde2UgtBwPZpoc6fndTPpAzhet33c/exec"; 
