@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gestiones AAD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-mark"></div>
+      <h1>Gestiones AAD</h1>
+      <p>Seguimiento de trámites de contratación</p>
+    </div>
+    <form id="loginForm">
+      <label>Usuario
+        <input type="text" id="loginUsuario" autocomplete="username" required />
+      </label>
+      <label>Contraseña
+        <input type="password" id="loginClave" autocomplete="current-password" required />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Ingresar</button>
+      <p id="loginError" class="form-error" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="app" hidden>
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-mark"></div>
+      <span>Gestiones AAD</span>
+    </div>
+    <nav class="topnav" id="topnav">
+      <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" data-view="registros">Registros</button>
+      <button class="nav-btn" data-view="formulario">Nuevo trámite</button>
+      <button class="nav-btn" data-view="usuarios" id="navUsuarios" hidden>Usuarios</button>
+    </nav>
+    <div class="topbar-user">
+      <span id="userName"></span>
+      <button id="logoutBtn" class="btn btn-ghost">Salir</button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- ---------- DASHBOARD ---------- -->
+    <section id="view-dashboard" class="view">
+      <div class="view-header">
+        <h2>Seguimiento presupuestario y de ejecución</h2>
+        <div class="control-inline">
+          <label>Agrupar por
+            <select id="dashGroupBy">
+              <option value="sucursal">Sucursal</option>
+              <option value="pospre">PosPre</option>
+              <option value="nroPedidoCompras">Pedido de Compras</option>
+              <option value="adjudicatario">Contratista/Proveedor</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="kpi-row" id="kpiRow"></div>
+      <div class="chart-grid">
+        <div class="panel">
+          <h3>Presupuesto oficial vs. adjudicado vs. certificado</h3>
+          <canvas id="chartMontos" height="260"></canvas>
+        </div>
+        <div class="panel">
+          <h3>Cantidad de trámites por estado</h3>
+          <canvas id="chartEstados" height="260"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Detalle por agrupación</h3>
+        <div class="table-wrap">
+          <table id="dashTable" class="data-table"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- REGISTROS ---------- -->
+    <section id="view-registros" class="view" hidden>
+      <div class="view-header">
+        <h2>Trámites cargados</h2>
+        <div class="control-inline">
+          <button id="exportBtn" class="btn btn-secondary">Exportar vida completa (Excel)</button>
+        </div>
+      </div>
+
+      <div class="filters-bar" id="filtersBar">
+        <div class="filter-field">
+          <label>Pospre</label>
+          <select data-filter="pospre"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Expediente</label>
+          <input type="text" data-filter="expediente" placeholder="Buscar..." />
+        </div>
+        <div class="filter-field">
+          <label>Año</label>
+          <select data-filter="anio"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Pedido de Compras</label>
+          <select data-filter="nroPedidoCompras"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Contratista/Proveedor</label>
+          <select data-filter="adjudicatario"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Sucursal</label>
+          <select data-filter="sucursal"><option value="">Todas</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Rubro</label>
+          <select data-filter="rubro"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Estado</label>
+          <select data-filter="estado"><option value="">Todos</option></select>
+        </div>
+        <button id="clearFilters" class="btn btn-ghost">Limpiar filtros</button>
+      </div>
+
+      <p class="results-count" id="resultsCount"></p>
+
+      <div class="table-wrap">
+        <table id="recordsTable" class="data-table"></table>
+      </div>
+    </section>
+
+    <!-- ---------- FORMULARIO (alta / edición) ---------- -->
+    <section id="view-formulario" class="view" hidden>
+      <div class="view-header">
+        <h2 id="formTitle">Nuevo trámite</h2>
+        <div class="control-inline">
+          <button id="formNewBtn" class="btn btn-ghost">Limpiar / nuevo</button>
+        </div>
+      </div>
+
+      <div class="lifeline" id="lifeline"></div>
+
+      <form id="recordForm">
+        <div id="stagePanels"></div>
+        <div class="form-actions">
+          <p id="formMsg" class="form-msg" hidden></p>
+          <button type="submit" class="btn btn-primary">Guardar trámite</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ---------- USUARIOS (admin) ---------- -->
+    <section id="view-usuarios" class="view" hidden>
+      <div class="view-header">
+        <h2>Usuarios con acceso</h2>
+      </div>
+      <div class="panel" style="max-width:420px">
+        <h3>Nuevo usuario</h3>
+        <form id="userForm">
+          <label>Usuario (login)
+            <input type="text" id="newUsuario" required />
+          </label>
+          <label>Nombre visible
+            <input type="text" id="newNombre" required />
+          </label>
+          <label>Contraseña
+            <input type="password" id="newClave" required />
+          </label>
+          <label>Rol
+            <select id="newRol">
+              <option value="editor">Editor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Crear usuario</button>
+          <p id="userMsg" class="form-msg" hidden></p>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table id="usersTable" class="data-table"></table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
