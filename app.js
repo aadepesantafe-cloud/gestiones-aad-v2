@@ -196,6 +196,9 @@ async function boot() {
     state.campos = data.campos;
     state.etapas = data.etapas;
     state.registros = data.registros;
+    if (!state.registros.length) {
+      showAppError('Conectado correctamente, pero la hoja "Gestiones Plan" no devolvió ninguna fila. Revisá que esa pestaña tenga tus datos y que su nombre sea exactamente "Gestiones Plan".');
+    }
   } catch (err) {
     showAppError('No se pudieron cargar los datos: ' + err.message);
     return; // no seguimos si no hay datos
