@@ -75,6 +75,7 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   background:#FEE2E2; color:#991B1B; border-bottom:1px solid #FCA5A5;
   padding:10px 20px; font-size:13px; font-weight:600;
   display:flex; align-items:center; justify-content:space-between; gap:12px;
+  flex-shrink:0;
 }
 .app-error button{
   background:#991B1B; color:#fff; border:none; border-radius:6px;
@@ -82,30 +83,43 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 }
 
 /* ============ SHELL ============ */
-.app{ min-height:100vh; display:flex; flex-direction:column; }
+.app{ min-height:100vh; height:100vh; display:flex; overflow:hidden; }
 
-.topbar{
-  display:flex; align-items:center; gap:24px;
+/* ---- Sidebar (siempre visible, no scrollea) ---- */
+.sidebar{
+  width:230px; flex-shrink:0; height:100vh;
+  display:flex; flex-direction:column;
   background:var(--brand-dark);
   color:#fff;
-  padding:0 20px;
-  height:56px;
-  flex-shrink:0;
-  position:sticky; top:0; z-index:20;
+  padding:18px 14px;
 }
-.topbar-brand{ display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:-0.01em; white-space:nowrap; }
+.sidebar-brand{
+  display:flex; align-items:center; gap:10px; font-weight:600; letter-spacing:-0.01em;
+  padding:6px 8px 22px;
+  font-size:15px;
+}
 .brand-mark{
-  width:20px; height:20px; border-radius:5px;
+  width:22px; height:22px; border-radius:6px; flex-shrink:0;
   background:linear-gradient(135deg, var(--stage-1), var(--stage-2) 40%, var(--stage-4) 75%, var(--stage-5));
 }
-.topnav{ display:flex; gap:4px; flex:1; }
+.sidenav{ display:flex; flex-direction:column; gap:3px; flex:1; }
 .nav-btn{
+  display:flex; align-items:center; gap:10px;
   background:none; border:none; color:rgba(255,255,255,0.65);
-  padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:500;
+  padding:10px 12px; border-radius:8px; cursor:pointer; font-weight:500;
+  text-align:left; width:100%; font-size:13.5px;
 }
+.nav-icon{ font-size:13px; width:16px; text-align:center; opacity:0.8; }
 .nav-btn:hover{ color:#fff; background:rgba(255,255,255,0.08); }
-.nav-btn.active{ color:#fff; background:rgba(255,255,255,0.14); }
-.topbar-user{ display:flex; align-items:center; gap:12px; font-size:13px; color:rgba(255,255,255,0.85); }
+.nav-btn.active{ color:#fff; background:rgba(255,255,255,0.16); }
+
+.sidebar-user{ border-top:1px solid rgba(255,255,255,0.12); padding-top:14px; margin-top:10px; }
+.sidebar-user-name{ font-size:12.5px; color:rgba(255,255,255,0.75); margin-bottom:10px; padding:0 4px; word-break:break-word; }
+.sidebar .btn-ghost{ color:rgba(255,255,255,0.85); border-color:rgba(255,255,255,0.3); }
+.sidebar .btn-ghost:hover{ background:rgba(255,255,255,0.1); }
+
+/* ---- Área principal (scrollea sola, sidebar queda fija) ---- */
+.main-area{ flex:1; height:100vh; overflow-y:auto; display:flex; flex-direction:column; min-width:0; }
 
 .content{ flex:1; padding:24px 28px 60px; max-width:1320px; width:100%; margin:0 auto; }
 
@@ -141,6 +155,13 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 
 .chart-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px; }
 @media (max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }
+
+@media (max-width:720px){
+  .sidebar{ width:180px; padding:14px 10px; }
+  .sidebar-brand span{ display:none; }
+  .nav-btn span:not(.nav-icon){ display:none; }
+  .content{ padding:18px 16px 40px; }
+}
 
 .panel{
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);

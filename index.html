@@ -35,25 +35,34 @@
 
 <!-- ===================== APP ===================== -->
 <div id="app" class="app" hidden>
-  <div id="appError" class="app-error" hidden></div>
-  <header class="topbar">
-    <div class="topbar-brand">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
       <div class="brand-mark"></div>
       <span>Gestiones AAD</span>
     </div>
-    <nav class="topnav" id="topnav">
-      <button class="nav-btn active" data-view="dashboard">Dashboard</button>
-      <button class="nav-btn" data-view="registros">Registros</button>
-      <button class="nav-btn" data-view="formulario">Nuevo trámite</button>
-      <button class="nav-btn" data-view="usuarios" id="navUsuarios" hidden>Usuarios</button>
+    <nav class="sidenav" id="sidenav">
+      <button class="nav-btn active" data-view="dashboard">
+        <span class="nav-icon">◆</span> Dashboard
+      </button>
+      <button class="nav-btn" data-view="registros">
+        <span class="nav-icon">▤</span> Registros
+      </button>
+      <button class="nav-btn" data-view="formulario">
+        <span class="nav-icon">＋</span> Nuevo trámite
+      </button>
+      <button class="nav-btn" data-view="usuarios" id="navUsuarios" hidden>
+        <span class="nav-icon">◍</span> Usuarios
+      </button>
     </nav>
-    <div class="topbar-user">
-      <span id="userName"></span>
-      <button id="logoutBtn" class="btn btn-ghost">Salir</button>
+    <div class="sidebar-user">
+      <div class="sidebar-user-name" id="userName"></div>
+      <button id="logoutBtn" class="btn btn-ghost btn-block">Salir</button>
     </div>
-  </header>
+  </aside>
 
-  <main class="content">
+  <div class="main-area">
+    <div id="appError" class="app-error" hidden></div>
+    <main class="content">
 
     <!-- ---------- DASHBOARD ---------- -->
     <section id="view-dashboard" class="view">
@@ -225,6 +234,7 @@
     </section>
 
   </main>
+  </div>
 </div>
 
 <script src="config.js"></script>

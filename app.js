@@ -113,7 +113,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 // ============================================================
 // NAVEGACIÓN
 // ============================================================
-document.getElementById('topnav').addEventListener('click', (e) => {
+document.getElementById('sidenav').addEventListener('click', (e) => {
   const btn = e.target.closest('.nav-btn');
   if (!btn) return;
   showView(btn.dataset.view);
