@@ -179,6 +179,7 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .kpi-card .kpi-sub{ font-size:12px; color:var(--text-soft); margin-top:4px; }
 
 #chartEtapas{ max-height:190px; }
+#chartEstados{ max-height:220px; max-width:420px; margin:0 auto; display:block; }
 
 .chart-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px; }
 @media (max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }

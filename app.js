@@ -508,15 +508,37 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartEstados, chartEtapas;
+let chartMontos, chartEstados, chartEtapas, chartCertificacion;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
+
+// Plugin de Chart.js "casero" para dibujar el valor sobre cada punto de la curva
+const pointLabelPlugin = {
+  id: 'pointLabelPlugin',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset, i) => {
+      const meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      meta.data.forEach((point, index) => {
+        const value = dataset.data[index];
+        if (value == null) return;
+        ctx.save();
+        ctx.fillStyle = '#16202A';
+        ctx.font = '600 11px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(value.toFixed(1) + '%', point.x, point.y - 12);
+        ctx.restore();
+      });
+    });
+  }
+};
 
 function renderDashboard() {
   const groupKey = document.getElementById('dashGroupBy').value;
   const rows = filteredForDashboard();
 
-  // KPIs generales
+  // ---- KPIs generales (montos en millones, 2 decimales) ----
   const totalPresOficial = sumField(rows, 'presupuestoOficialRubro');
   const totalAdjudicado = sumField(rows, 'totalAdjudicado');
   const totalCertificado = sumField(rows, 'certificadosAAD');
@@ -529,12 +551,12 @@ function renderDashboard() {
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = [
     kpiCard('Trámites (filtro actual)', rows.length, 'de ' + state.registros.length + ' totales'),
-    kpiCard('Presupuesto oficial total', formatMoney(totalPresOficial), 'sin IVA'),
-    kpiCard('Total adjudicado', formatMoney(totalAdjudicado), 'sin IVA'),
-    kpiCard('Certificado por AAD', formatMoney(totalCertificado), 'IVA incluido'),
+    kpiCard('Presupuesto oficial total', formatMillions(totalPresOficial), 'sin IVA'),
+    kpiCard('Total adjudicado', formatMillions(totalAdjudicado), 'sin IVA'),
+    kpiCard('Certificado por AAD', formatMillions(totalCertificado), 'IVA incluido'),
     kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'adjudicado / presupuesto oficial'),
     kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
-    kpiCard('Multas acumuladas', formatMoney(totalMultas), 'IVA incluido'),
+    kpiCard('Multas acumuladas', formatMillions(totalMultas), 'IVA incluido'),
     kpiCard('Avance de certificación', avanceCertProm.toFixed(1) + '%', 'promedio sobre trámites con dato'),
   ].join('');
 
@@ -547,51 +569,93 @@ function renderDashboard() {
   if (chartEtapas) chartEtapas.destroy();
   chartEtapas = new Chart(ctx3, {
     type: 'bar',
-    data: {
-      labels: stageLabels,
-      datasets: [{ label: 'Trámites', data: stageCounts, backgroundColor: stageColors }]
-    },
+    data: { labels: stageLabels, datasets: [{ label: 'Trámites', data: stageCounts, backgroundColor: stageColors }] },
     options: {
-      indexAxis: 'y',
-      responsive: true,
+      indexAxis: 'y', responsive: true,
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
       plugins: { legend: { display: false } }
     }
   });
 
-  // Agrupación
-  const groups = {};
+  // ---- Gráfico 1: Presupuesto Oficial vs Adjudicado vs Certificado, por Sucursal ----
+  // (siempre agrupado por Sucursal, respeta los filtros del dashboard incluido Pospre)
+  const bySucursal = {};
   rows.forEach(r => {
-    const key = (r[groupKey] || '(sin dato)').toString().trim() || '(sin dato)';
-    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0 };
-    groups[key].n++;
-    groups[key].presOficial += num(r.presupuestoOficialRubro);
-    groups[key].adjudicado += num(r.totalAdjudicado);
-    groups[key].certificado += num(r.certificadosAAD);
+    const key = (r.sucursal || '(sin sucursal)').toString().trim() || '(sin sucursal)';
+    if (!bySucursal[key]) bySucursal[key] = { presOficial:0, adjudicado:0, certificado:0 };
+    bySucursal[key].presOficial += num(r.presupuestoOficialRubro);
+    bySucursal[key].adjudicado += num(r.totalAdjudicado);
+    bySucursal[key].certificado += num(r.certificadosAAD);
   });
-  const entries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial).slice(0, 12);
+  const sucursalEntries = Object.entries(bySucursal).sort((a,b) => b[1].presOficial - a[1].presOficial);
 
-  // Chart de montos por grupo
   const ctx1 = document.getElementById('chartMontos').getContext('2d');
   if (chartMontos) chartMontos.destroy();
   chartMontos = new Chart(ctx1, {
     type: 'bar',
     data: {
-      labels: entries.map(e => e[0]),
+      labels: sucursalEntries.map(e => e[0]),
       datasets: [
-        { label: 'Presupuesto Oficial', data: entries.map(e => e[1].presOficial), backgroundColor: '#2563EB' },
-        { label: 'Total Adjudicado', data: entries.map(e => e[1].adjudicado), backgroundColor: '#7C3AED' },
-        { label: 'Certificado AAD', data: entries.map(e => e[1].certificado), backgroundColor: '#16A34A' }
+        { label: 'Presupuesto Oficial', data: sucursalEntries.map(e => e[1].presOficial / 1000000), backgroundColor: '#2563EB' },
+        { label: 'Total Adjudicado', data: sucursalEntries.map(e => e[1].adjudicado / 1000000), backgroundColor: '#7C3AED' },
+        { label: 'Certificado AAD', data: sucursalEntries.map(e => e[1].certificado / 1000000), backgroundColor: '#16A34A' }
       ]
     },
     options: {
       responsive:true,
-      scales:{ x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30 } }, y:{ beginAtZero:true } },
-      plugins:{ legend:{ position:'bottom' } }
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30 } },
+        y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } }
+      },
+      plugins:{
+        legend:{ position:'bottom' },
+        tooltip:{ callbacks:{ label: (ctx) => ctx.dataset.label + ': $ ' + ctx.parsed.y.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' M' } }
+      }
     }
   });
 
-  // Chart de estados
+  // ---- Gráfico 2: % de Certificación por Sucursal + Contratista (curva) ----
+  const byCombo = {};
+  rows.forEach(r => {
+    if (!r.adjudicatario) return;
+    const key = (r.sucursal || '(sin sucursal)').trim() + ' · ' + r.adjudicatario.trim();
+    if (!byCombo[key]) byCombo[key] = { presOficial:0, certificado:0 };
+    byCombo[key].presOficial += num(r.presupuestoOficialRubro);
+    byCombo[key].certificado += num(r.certificadosAAD);
+  });
+  const comboEntries = Object.entries(byCombo)
+    .map(([k, v]) => [k, v.presOficial > 0 ? (v.certificado / v.presOficial) * 100 : 0])
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 15);
+
+  const ctx4 = document.getElementById('chartCertificacion').getContext('2d');
+  if (chartCertificacion) chartCertificacion.destroy();
+  chartCertificacion = new Chart(ctx4, {
+    type: 'line',
+    data: {
+      labels: comboEntries.map(e => e[0]),
+      datasets: [{
+        label: '% Certificación',
+        data: comboEntries.map(e => e[1]),
+        borderColor: '#0D9488',
+        backgroundColor: '#0D9488',
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#0D9488'
+      }]
+    },
+    plugins: [pointLabelPlugin],
+    options: {
+      responsive:true,
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
+        y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
+      },
+      plugins:{ legend:{ display:false } }
+    }
+  });
+
+  // ---- Gráfico de estados ----
   const estadoCounts = {};
   rows.forEach(r => {
     const e = (r.estado || 'Sin estado').trim() || 'Sin estado';
@@ -608,11 +672,22 @@ function renderDashboard() {
     options: { responsive:true, plugins:{ legend:{ position:'bottom' } } }
   });
 
-  // Tabla de detalle
+  // ---- Tabla de detalle (según "Agrupar por") ----
+  const groups = {};
+  rows.forEach(r => {
+    const key = (r[groupKey] || '(sin dato)').toString().trim() || '(sin dato)';
+    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0 };
+    groups[key].n++;
+    groups[key].presOficial += num(r.presupuestoOficialRubro);
+    groups[key].adjudicado += num(r.totalAdjudicado);
+    groups[key].certificado += num(r.certificadosAAD);
+  });
+  const entries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial).slice(0, 12);
+
   const table = document.getElementById('dashTable');
   table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th></tr></thead>' +
     '<tbody>' + entries.map(([k, v]) =>
-      `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMoney(v.presOficial)}</td><td>${formatMoney(v.adjudicado)}</td><td>${formatMoney(v.certificado)}</td></tr>`
+      `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td></tr>`
     ).join('') + '</tbody>';
 }
 
@@ -627,6 +702,10 @@ function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 function formatMoney(v) {
   const n = num(v);
   return '$ ' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
+}
+function formatMillions(v) {
+  const n = num(v) / 1000000;
+  return '$ ' + n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' M';
 }
 
 // ============================================================
