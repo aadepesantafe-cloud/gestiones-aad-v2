@@ -98,23 +98,23 @@
       <div class="filters-bar" id="dashFiltersBar">
         <div class="filter-field">
           <label>Año</label>
-          <select data-dashfilter="anio"><option value="">Todos</option></select>
+          <div class="multiselect" data-dashfilter="anio"></div>
         </div>
         <div class="filter-field">
           <label>Sucursal</label>
-          <select data-dashfilter="sucursal"><option value="">Todas</option></select>
+          <div class="multiselect" data-dashfilter="sucursal"></div>
         </div>
         <div class="filter-field">
           <label>Rubro</label>
-          <select data-dashfilter="rubro"><option value="">Todos</option></select>
+          <div class="multiselect" data-dashfilter="rubro"></div>
         </div>
         <div class="filter-field">
           <label>Pospre</label>
-          <select data-dashfilter="pospre"><option value="">Todos</option></select>
+          <div class="multiselect" data-dashfilter="pospre"></div>
         </div>
         <div class="filter-field">
           <label>Estado</label>
-          <select data-dashfilter="estado"><option value="">Todos</option></select>
+          <div class="multiselect" data-dashfilter="estado"></div>
         </div>
         <button id="dashClearFilters" class="btn btn-ghost">Limpiar filtros</button>
       </div>
@@ -122,23 +122,12 @@
       <div class="kpi-row" id="kpiRow"></div>
 
       <div class="panel">
-        <h3>Avance por etapa — cantidad de trámites según la última etapa alcanzada</h3>
-        <canvas id="chartEtapas" height="110"></canvas>
-      </div>
-
-      <div class="chart-grid">
-        <div class="panel">
-          <h3>Presupuesto Oficial vs. Adjudicado vs. Certificación — por Sucursal (Pospre filtrada)</h3>
-          <canvas id="chartMontos" height="260"></canvas>
-        </div>
-        <div class="panel">
-          <h3>% de Certificación por Sucursal / Contratista</h3>
-          <canvas id="chartCertificacion" height="260"></canvas>
-        </div>
+        <h3>Presupuesto Oficial vs. Adjudicado vs. Certificación — por Sucursal (Pospre filtrada)</h3>
+        <canvas id="chartMontos" height="130"></canvas>
       </div>
       <div class="panel">
-        <h3>Cantidad de trámites por estado</h3>
-        <canvas id="chartEstados" height="140"></canvas>
+        <h3>% de Certificación por Sucursal / Contratista</h3>
+        <canvas id="chartCertificacion" height="130"></canvas>
       </div>
       <div class="panel">
         <h3>Detalle por agrupación</h3>
@@ -160,7 +149,7 @@
       <div class="filters-bar" id="filtersBar">
         <div class="filter-field">
           <label>Pospre</label>
-          <select data-filter="pospre"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="pospre"></div>
         </div>
         <div class="filter-field">
           <label>Expediente</label>
@@ -168,27 +157,27 @@
         </div>
         <div class="filter-field">
           <label>Año</label>
-          <select data-filter="anio"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="anio"></div>
         </div>
         <div class="filter-field">
           <label>Pedido de Compras</label>
-          <select data-filter="nroPedidoCompras"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="nroPedidoCompras"></div>
         </div>
         <div class="filter-field">
           <label>Contratista/Proveedor</label>
-          <select data-filter="adjudicatario"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="adjudicatario"></div>
         </div>
         <div class="filter-field">
           <label>Sucursal</label>
-          <select data-filter="sucursal"><option value="">Todas</option></select>
+          <div class="multiselect" data-filter="sucursal"></div>
         </div>
         <div class="filter-field">
           <label>Rubro</label>
-          <select data-filter="rubro"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="rubro"></div>
         </div>
         <div class="filter-field">
           <label>Estado</label>
-          <select data-filter="estado"><option value="">Todos</option></select>
+          <div class="multiselect" data-filter="estado"></div>
         </div>
         <button id="clearFilters" class="btn btn-ghost">Limpiar filtros</button>
       </div>

@@ -178,8 +178,8 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .kpi-card .kpi-value{ font-family:var(--font-mono); font-size:22px; font-weight:600; margin-top:6px; }
 .kpi-card .kpi-sub{ font-size:12px; color:var(--text-soft); margin-top:4px; }
 
-#chartEtapas{ max-height:190px; }
-#chartEstados{ max-height:220px; max-width:420px; margin:0 auto; display:block; }
+#chartMontos{ height:380px !important; }
+#chartCertificacion{ height:380px !important; }
 
 .chart-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px; }
 @media (max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }
@@ -209,6 +209,40 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   padding:7px 9px; border:1px solid var(--border); border-radius:7px; background:#fff;
 }
 .results-count{ color:var(--text-soft); font-size:12px; margin:0 0 10px; }
+
+/* ============ MULTISELECT (filtros por tildado) ============ */
+.multiselect{ position:relative; min-width:150px; }
+.ms-toggle{
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:7px 9px; border:1px solid var(--border); border-radius:7px; background:#fff;
+  cursor:pointer; font-size:13px; color:var(--text); text-align:left;
+}
+.ms-toggle:hover{ border-color:var(--brand); }
+.ms-toggle-label{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ms-caret{ color:var(--text-soft); font-size:10px; flex-shrink:0; }
+.multiselect.open .ms-caret{ transform:rotate(180deg); }
+
+.ms-panel{
+  position:absolute; top:calc(100% + 4px); left:0; z-index:30;
+  min-width:220px; max-height:260px; overflow-y:auto;
+  background:#fff; border:1px solid var(--border); border-radius:9px;
+  box-shadow:0 10px 30px rgba(3,20,28,0.15);
+  padding:6px;
+}
+.multiselect:not(.open) .ms-panel{ display:none; }
+.ms-clear{
+  display:block; width:100%; text-align:left; background:none; border:none;
+  padding:6px 8px; font-size:12px; font-weight:600; color:var(--brand);
+  border-bottom:1px solid var(--border); margin-bottom:4px; cursor:pointer;
+}
+.ms-clear:hover{ background:var(--brand-soft); border-radius:6px 6px 0 0; }
+.ms-option{
+  display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px;
+  font-size:13px; font-weight:400; color:var(--text); cursor:pointer; white-space:nowrap;
+}
+.ms-option:hover{ background:var(--brand-soft); }
+.ms-option input{ margin:0; flex-shrink:0; }
+.ms-empty{ padding:8px; font-size:12px; color:var(--text-soft); }
 
 /* ============ TABLE ============ */
 .table-wrap{ overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }

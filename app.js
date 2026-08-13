@@ -375,33 +375,99 @@ function uniqueValues(key) {
   return Array.from(set).sort();
 }
 
+// ---- Componente de selección múltiple por tildado (checkboxes) ----
+function closeAllMultiselects(except) {
+  document.querySelectorAll('.multiselect.open').forEach(ms => { if (ms !== except) ms.classList.remove('open'); });
+}
+document.addEventListener('click', () => closeAllMultiselects());
+
+function msLabel(selected) {
+  if (!selected || selected.length === 0) return 'Todos';
+  if (selected.length === 1) return selected[0];
+  return selected.length + ' seleccionados';
+}
+
+function getCheckedValues(el) {
+  return Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+}
+
+function renderMultiselect(el, options, selected, onChange) {
+  const sel = new Set(selected || []);
+  el.innerHTML =
+    '<button type="button" class="ms-toggle"><span class="ms-toggle-label">' + escapeHtml(msLabel(selected)) + '</span><span class="ms-caret">▾</span></button>' +
+    '<div class="ms-panel">' +
+      '<button type="button" class="ms-clear">Limpiar selección</button>' +
+      (options.length
+        ? options.map(o => '<label class="ms-option"><input type="checkbox" value="' + escapeHtml(o) + '" ' + (sel.has(o) ? 'checked' : '') + '/><span>' + escapeHtml(o) + '</span></label>').join('')
+        : '<div class="ms-empty">Sin opciones</div>') +
+    '</div>';
+
+  if (!el.dataset.wired) {
+    el.dataset.wired = '1';
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target.closest('.ms-toggle')) {
+        const willOpen = !el.classList.contains('open');
+        closeAllMultiselects(el);
+        el.classList.toggle('open', willOpen);
+      } else if (e.target.closest('.ms-clear')) {
+        el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+        const label = el.querySelector('.ms-toggle-label');
+        if (label) label.textContent = 'Todos';
+        el._msOnChange && el._msOnChange([]);
+      }
+    });
+    el.addEventListener('change', (e) => {
+      if (e.target.matches('input[type=checkbox]')) {
+        const checked = getCheckedValues(el);
+        const label = el.querySelector('.ms-toggle-label');
+        if (label) label.textContent = msLabel(checked);
+        el._msOnChange && el._msOnChange(checked);
+      }
+    });
+  }
+  el._msOnChange = onChange; // siempre apunta al callback más reciente
+}
+
 function populateFilterOptions() {
-  document.querySelectorAll('#filtersBar select[data-filter]').forEach(sel => {
-    const key = sel.dataset.filter;
-    const current = sel.value;
+  FILTER_KEYS.filter(k => k !== 'expediente').forEach(key => {
+    const el = document.querySelector('#filtersBar [data-filter="' + key + '"]');
+    if (!el) return;
     const opts = uniqueValues(key);
-    sel.innerHTML = '<option value="">Todos</option>' + opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-    if (opts.includes(current)) sel.value = current;
+    state.filtros[key] = (state.filtros[key] || []).filter(v => opts.includes(v));
+    renderMultiselect(el, opts, state.filtros[key], (vals) => {
+      state.filtros[key] = vals;
+      renderRegistros();
+    });
   });
-  document.querySelectorAll('#dashFiltersBar select[data-dashfilter]').forEach(sel => {
-    const key = sel.dataset.dashfilter;
-    const current = sel.value;
+
+  DASH_FILTER_KEYS.forEach(key => {
+    const el = document.querySelector('#dashFiltersBar [data-dashfilter="' + key + '"]');
+    if (!el) return;
     const opts = uniqueValues(key);
-    sel.innerHTML = '<option value="">Todos</option>' + opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
-    if (opts.includes(current)) sel.value = current;
+    state.dashFiltros[key] = (state.dashFiltros[key] || []).filter(v => opts.includes(v));
+    renderMultiselect(el, opts, state.dashFiltros[key], (vals) => {
+      state.dashFiltros[key] = vals;
+      renderDashboard();
+    });
   });
 }
 
-document.getElementById('dashFiltersBar').addEventListener('input', () => {
-  DASH_FILTER_KEYS.forEach(k => {
-    const el = document.querySelector('[data-dashfilter="' + k + '"]');
-    state.dashFiltros[k] = el ? el.value.trim() : '';
-  });
-  renderDashboard();
+document.querySelector('#filtersBar [data-filter="expediente"]').addEventListener('input', (e) => {
+  state.filtros.expediente = e.target.value.trim();
+  renderRegistros();
 });
+document.getElementById('clearFilters').addEventListener('click', () => {
+  FILTER_KEYS.forEach(k => { state.filtros[k] = (k === 'expediente') ? '' : []; });
+  const expEl = document.querySelector('#filtersBar [data-filter="expediente"]');
+  if (expEl) expEl.value = '';
+  populateFilterOptions();
+  renderRegistros();
+});
+
 document.getElementById('dashClearFilters').addEventListener('click', () => {
-  state.dashFiltros = {};
-  document.querySelectorAll('#dashFiltersBar [data-dashfilter]').forEach(el => el.value = '');
+  DASH_FILTER_KEYS.forEach(k => { state.dashFiltros[k] = []; });
+  populateFilterOptions();
   renderDashboard();
 });
 
@@ -409,40 +475,17 @@ function filteredForDashboard() {
   return applyFilters(state.registros, state.dashFiltros, DASH_FILTER_KEYS);
 }
 
-// ---- Determina la última etapa alcanzada por un trámite, según qué campos tiene cargados ----
-function computeStageIndex(r) {
-  const has = (k) => r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '';
-  const rubroVal = (r.rubro || '').toLowerCase();
-  const isOM = rubroVal.includes('obra menor') || rubroVal === 'om';
-
-  if (has('sumatoriaMultas') || has('pctAvanceCertificacion') || has('certificadosAAD')) return 4; // Certificación
-  if (isOM && (has('cantidadProyectos') || has('proyectadosAcumulados') || has('cantTotalIIBBProyectados'))) return 3; // Proyectos
-  if (has('fechaActoAdmin') || has('fechaInicioReal') || has('fechaFinContrato')) return 2; // Ejecución
-  if (has('nroPedidoCompras') || has('adjudicatario') || has('estado')) return 1; // Adjudicación
-  return 0; // Lanzamiento
-}
-
-document.getElementById('filtersBar').addEventListener('input', () => {
-  FILTER_KEYS.forEach(k => {
-    const el = document.querySelector('[data-filter="' + k + '"]');
-    state.filtros[k] = el ? el.value.trim() : '';
-  });
-  renderRegistros();
-});
-document.getElementById('clearFilters').addEventListener('click', () => {
-  state.filtros = {};
-  document.querySelectorAll('#filtersBar [data-filter]').forEach(el => el.value = '');
-  renderRegistros();
-});
-
 function applyFilters(rows, filtros, keys) {
   return rows.filter(r => {
     return keys.every(k => {
       const fval = filtros[k];
-      if (!fval) return true;
-      const rval = String(r[k] || '').toLowerCase();
-      if (k === 'expediente') return rval.includes(fval.toLowerCase());
-      return rval === String(fval).toLowerCase();
+      if (k === 'expediente') {
+        if (!fval) return true;
+        return String(r.expediente || '').toLowerCase().includes(String(fval).toLowerCase());
+      }
+      if (!fval || !fval.length) return true; // sin selección = sin filtro
+      const rval = String(r[k] || '').trim();
+      return fval.includes(rval);
     });
   });
 }
@@ -508,7 +551,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartEstados, chartEtapas, chartCertificacion;
+let chartMontos, chartCertificacion;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
@@ -560,23 +603,6 @@ function renderDashboard() {
     kpiCard('Avance de certificación', avanceCertProm.toFixed(1) + '%', 'promedio sobre trámites con dato'),
   ].join('');
 
-  // ---- Gráfico de avance por etapa ----
-  const stageCounts = [0,0,0,0,0];
-  rows.forEach(r => { stageCounts[computeStageIndex(r)]++; });
-  const stageLabels = state.etapas.map(e => e.label);
-  const stageColors = ['#2563EB','#7C3AED','#D97706','#0D9488','#16A34A'];
-  const ctx3 = document.getElementById('chartEtapas').getContext('2d');
-  if (chartEtapas) chartEtapas.destroy();
-  chartEtapas = new Chart(ctx3, {
-    type: 'bar',
-    data: { labels: stageLabels, datasets: [{ label: 'Trámites', data: stageCounts, backgroundColor: stageColors }] },
-    options: {
-      indexAxis: 'y', responsive: true,
-      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
-      plugins: { legend: { display: false } }
-    }
-  });
-
   // ---- Gráfico 1: Presupuesto Oficial vs Adjudicado vs Certificado, por Sucursal ----
   // (siempre agrupado por Sucursal, respeta los filtros del dashboard incluido Pospre)
   const bySucursal = {};
@@ -602,7 +628,7 @@ function renderDashboard() {
       ]
     },
     options: {
-      responsive:true,
+      responsive:true, maintainAspectRatio:false,
       scales:{
         x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30 } },
         y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } }
@@ -646,30 +672,13 @@ function renderDashboard() {
     },
     plugins: [pointLabelPlugin],
     options: {
-      responsive:true,
+      responsive:true, maintainAspectRatio:false,
       scales:{
         x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
         y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
       },
       plugins:{ legend:{ display:false } }
     }
-  });
-
-  // ---- Gráfico de estados ----
-  const estadoCounts = {};
-  rows.forEach(r => {
-    const e = (r.estado || 'Sin estado').trim() || 'Sin estado';
-    estadoCounts[e] = (estadoCounts[e] || 0) + 1;
-  });
-  const ctx2 = document.getElementById('chartEstados').getContext('2d');
-  if (chartEstados) chartEstados.destroy();
-  chartEstados = new Chart(ctx2, {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(estadoCounts),
-      datasets: [{ data: Object.values(estadoCounts), backgroundColor: ['#16A34A','#DC2626','#D97706','#3730A3','#94A3B8','#0D9488'] }]
-    },
-    options: { responsive:true, plugins:{ legend:{ position:'bottom' } } }
   });
 
   // ---- Tabla de detalle (según "Agrupar por") ----
