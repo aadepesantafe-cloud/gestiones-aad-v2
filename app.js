@@ -110,6 +110,34 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   location.reload();
 });
 
+// ---- Mostrar la contraseña momentáneamente mientras el mouse está sobre el botón ----
+(function setupPasswordToggle() {
+  const btn = document.getElementById('togglePass');
+  const input = document.getElementById('loginClave');
+  const eyeOpen = btn.querySelector('.eye-open');
+  const eyeClosed = btn.querySelector('.eye-closed');
+
+  function reveal() {
+    input.type = 'text';
+    eyeOpen.hidden = true;
+    eyeClosed.hidden = false;
+  }
+  function hide() {
+    input.type = 'password';
+    eyeOpen.hidden = false;
+    eyeClosed.hidden = true;
+  }
+
+  btn.addEventListener('mouseenter', reveal);
+  btn.addEventListener('mouseleave', hide);
+  // Soporte táctil: mantener presionado para revelar
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); reveal(); });
+  btn.addEventListener('touchend', hide);
+  btn.addEventListener('touchcancel', hide);
+  // Evita que el botón robe el foco del campo de contraseña
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+})();
+
 // ============================================================
 // NAVEGACIÓN
 // ============================================================
