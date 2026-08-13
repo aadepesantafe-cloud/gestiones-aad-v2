@@ -70,6 +70,17 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 
 .form-error{ color:var(--danger); font-size:13px; margin-top:10px; }
 
+/* ============ ERROR BANNER ============ */
+.app-error{
+  background:#FEE2E2; color:#991B1B; border-bottom:1px solid #FCA5A5;
+  padding:10px 20px; font-size:13px; font-weight:600;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.app-error button{
+  background:#991B1B; color:#fff; border:none; border-radius:6px;
+  padding:5px 12px; font-size:12px; font-weight:600; cursor:pointer;
+}
+
 /* ============ SHELL ============ */
 .app{ min-height:100vh; display:flex; flex-direction:column; }
 
@@ -125,6 +136,8 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .kpi-card .kpi-label{ font-size:12px; color:var(--text-soft); font-weight:600; text-transform:uppercase; letter-spacing:0.03em; }
 .kpi-card .kpi-value{ font-family:var(--font-mono); font-size:22px; font-weight:600; margin-top:6px; }
 .kpi-card .kpi-sub{ font-size:12px; color:var(--text-soft); margin-top:4px; }
+
+#chartEtapas{ max-height:190px; }
 
 .chart-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px; }
 @media (max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }

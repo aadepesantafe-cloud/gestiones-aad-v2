@@ -35,6 +35,7 @@
 
 <!-- ===================== APP ===================== -->
 <div id="app" class="app" hidden>
+  <div id="appError" class="app-error" hidden></div>
   <header class="topbar">
     <div class="topbar-brand">
       <div class="brand-mark"></div>
@@ -69,7 +70,38 @@
           </label>
         </div>
       </div>
+
+      <div class="filters-bar" id="dashFiltersBar">
+        <div class="filter-field">
+          <label>Año</label>
+          <select data-dashfilter="anio"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Sucursal</label>
+          <select data-dashfilter="sucursal"><option value="">Todas</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Rubro</label>
+          <select data-dashfilter="rubro"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Pospre</label>
+          <select data-dashfilter="pospre"><option value="">Todos</option></select>
+        </div>
+        <div class="filter-field">
+          <label>Estado</label>
+          <select data-dashfilter="estado"><option value="">Todos</option></select>
+        </div>
+        <button id="dashClearFilters" class="btn btn-ghost">Limpiar filtros</button>
+      </div>
+
       <div class="kpi-row" id="kpiRow"></div>
+
+      <div class="panel">
+        <h3>Avance por etapa — cantidad de trámites según la última etapa alcanzada</h3>
+        <canvas id="chartEtapas" height="110"></canvas>
+      </div>
+
       <div class="chart-grid">
         <div class="panel">
           <h3>Presupuesto oficial vs. adjudicado vs. certificado</h3>

@@ -33,9 +33,12 @@ const state = {
   etapas: [],
   registros: [],
   filtros: {},
+  dashFiltros: {},
   editingId: null,
   activeStage: null
 };
+
+const DASH_FILTER_KEYS = ['anio','sucursal','rubro','pospre','estado'];
 
 // ============================================================
 // API
@@ -133,16 +136,42 @@ document.getElementById('formNewBtn').addEventListener('click', () => {
 // ============================================================
 // ARRANQUE
 // ============================================================
+function showAppError(msg) {
+  const box = document.getElementById('appError');
+  box.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = '⚠ ' + msg;
+  const btn = document.createElement('button');
+  btn.textContent = 'Reintentar';
+  btn.addEventListener('click', () => {
+    hideAppError();
+    boot().catch(err => showAppError(err.message));
+  });
+  box.appendChild(span);
+  box.appendChild(btn);
+  box.hidden = false;
+  console.error('Gestiones AAD - error:', msg);
+}
+function hideAppError() {
+  document.getElementById('appError').hidden = true;
+}
+
 async function boot() {
   document.getElementById('loginScreen').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('userName').textContent = state.session.nombre + ' (' + state.session.rol + ')';
   document.getElementById('navUsuarios').hidden = state.session.rol !== 'admin';
+  hideAppError();
 
-  const data = await apiCall('listar');
-  state.campos = data.campos;
-  state.etapas = data.etapas;
-  state.registros = data.registros;
+  try {
+    const data = await apiCall('listar');
+    state.campos = data.campos;
+    state.etapas = data.etapas;
+    state.registros = data.registros;
+  } catch (err) {
+    showAppError('No se pudieron cargar los datos: ' + err.message);
+    return; // no seguimos si no hay datos
+  }
 
   populateFilterOptions();
   buildForm({});
@@ -323,6 +352,43 @@ function populateFilterOptions() {
     sel.innerHTML = '<option value="">Todos</option>' + opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
     if (opts.includes(current)) sel.value = current;
   });
+  document.querySelectorAll('#dashFiltersBar select[data-dashfilter]').forEach(sel => {
+    const key = sel.dataset.dashfilter;
+    const current = sel.value;
+    const opts = uniqueValues(key);
+    sel.innerHTML = '<option value="">Todos</option>' + opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (opts.includes(current)) sel.value = current;
+  });
+}
+
+document.getElementById('dashFiltersBar').addEventListener('input', () => {
+  DASH_FILTER_KEYS.forEach(k => {
+    const el = document.querySelector('[data-dashfilter="' + k + '"]');
+    state.dashFiltros[k] = el ? el.value.trim() : '';
+  });
+  renderDashboard();
+});
+document.getElementById('dashClearFilters').addEventListener('click', () => {
+  state.dashFiltros = {};
+  document.querySelectorAll('#dashFiltersBar [data-dashfilter]').forEach(el => el.value = '');
+  renderDashboard();
+});
+
+function filteredForDashboard() {
+  return applyFilters(state.registros, state.dashFiltros, DASH_FILTER_KEYS);
+}
+
+// ---- Determina la última etapa alcanzada por un trámite, según qué campos tiene cargados ----
+function computeStageIndex(r) {
+  const has = (k) => r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '';
+  const rubroVal = (r.rubro || '').toLowerCase();
+  const isOM = rubroVal.includes('obra menor') || rubroVal === 'om';
+
+  if (has('sumatoriaMultas') || has('pctAvanceCertificacion') || has('certificadosAAD')) return 4; // Certificación
+  if (isOM && (has('cantidadProyectos') || has('proyectadosAcumulados') || has('cantTotalIIBBProyectados'))) return 3; // Proyectos
+  if (has('fechaActoAdmin') || has('fechaInicioReal') || has('fechaFinContrato')) return 2; // Ejecución
+  if (has('nroPedidoCompras') || has('adjudicatario') || has('estado')) return 1; // Adjudicación
+  return 0; // Lanzamiento
 }
 
 document.getElementById('filtersBar').addEventListener('input', () => {
@@ -338,16 +404,20 @@ document.getElementById('clearFilters').addEventListener('click', () => {
   renderRegistros();
 });
 
-function filteredRecords() {
-  return state.registros.filter(r => {
-    return FILTER_KEYS.every(k => {
-      const fval = state.filtros[k];
+function applyFilters(rows, filtros, keys) {
+  return rows.filter(r => {
+    return keys.every(k => {
+      const fval = filtros[k];
       if (!fval) return true;
       const rval = String(r[k] || '').toLowerCase();
       if (k === 'expediente') return rval.includes(fval.toLowerCase());
       return rval === String(fval).toLowerCase();
     });
   });
+}
+
+function filteredRecords() {
+  return applyFilters(state.registros, state.filtros, FILTER_KEYS);
 }
 
 const REGISTROS_COLS = [
@@ -407,25 +477,56 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartEstados;
+let chartMontos, chartEstados, chartEtapas;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
 function renderDashboard() {
   const groupKey = document.getElementById('dashGroupBy').value;
-  const rows = state.registros;
+  const rows = filteredForDashboard();
 
   // KPIs generales
   const totalPresOficial = sumField(rows, 'presupuestoOficialRubro');
   const totalAdjudicado = sumField(rows, 'totalAdjudicado');
   const totalCertificado = sumField(rows, 'certificadosAAD');
+  const totalMultas = sumField(rows, 'sumatoriaMultas');
+  const pctEjecucion = totalPresOficial > 0 ? (totalAdjudicado / totalPresOficial) * 100 : 0;
+  const desvioPresupuestario = totalPresOficial > 0 ? ((totalAdjudicado - totalPresOficial) / totalPresOficial) * 100 : 0;
+  const avanceCertVals = rows.map(r => num(r.pctAvanceCertificacion)).filter(v => v > 0);
+  const avanceCertProm = avanceCertVals.length ? (avanceCertVals.reduce((a,b) => a+b, 0) / avanceCertVals.length) : 0;
+
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = [
-    kpiCard('Trámites cargados', rows.length, ''),
+    kpiCard('Trámites (filtro actual)', rows.length, 'de ' + state.registros.length + ' totales'),
     kpiCard('Presupuesto oficial total', formatMoney(totalPresOficial), 'sin IVA'),
     kpiCard('Total adjudicado', formatMoney(totalAdjudicado), 'sin IVA'),
     kpiCard('Certificado por AAD', formatMoney(totalCertificado), 'IVA incluido'),
+    kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'adjudicado / presupuesto oficial'),
+    kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
+    kpiCard('Multas acumuladas', formatMoney(totalMultas), 'IVA incluido'),
+    kpiCard('Avance de certificación', avanceCertProm.toFixed(1) + '%', 'promedio sobre trámites con dato'),
   ].join('');
+
+  // ---- Gráfico de avance por etapa ----
+  const stageCounts = [0,0,0,0,0];
+  rows.forEach(r => { stageCounts[computeStageIndex(r)]++; });
+  const stageLabels = state.etapas.map(e => e.label);
+  const stageColors = ['#2563EB','#7C3AED','#D97706','#0D9488','#16A34A'];
+  const ctx3 = document.getElementById('chartEtapas').getContext('2d');
+  if (chartEtapas) chartEtapas.destroy();
+  chartEtapas = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: stageLabels,
+      datasets: [{ label: 'Trámites', data: stageCounts, backgroundColor: stageColors }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      plugins: { legend: { display: false } }
+    }
+  });
 
   // Agrupación
   const groups = {};
