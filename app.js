@@ -639,8 +639,9 @@ function renderDashboard() {
   const totalMultas = sumField(rows, 'sumatoriaMultas');
   const pctEjecucion = totalPresOficial > 0 ? (totalAdjudicado / totalPresOficial) * 100 : 0;
   const desvioPresupuestario = totalPresOficial > 0 ? ((totalAdjudicado - totalPresOficial) / totalPresOficial) * 100 : 0;
-  const avanceCertVals = rows.map(r => num(r.pctAvanceCertificacion)).filter(v => v > 0);
-  const avanceCertProm = avanceCertVals.length ? (avanceCertVals.reduce((a,b) => a+b, 0) / avanceCertVals.length) : 0;
+  // % de Avance por Certificación: misma fórmula que el campo calculado (Certificado / Adjudicado * 100),
+  // aplicada sobre los totales del filtro actual — para que coincida con el dato individual, no un promedio aparte.
+  const avanceCertificacion = totalAdjudicado > 0 ? (totalCertificado / totalAdjudicado) * 100 : 0;
 
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = [
@@ -651,7 +652,7 @@ function renderDashboard() {
     kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'adjudicado / presupuesto oficial'),
     kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
     kpiCard('Multas acumuladas', formatMillions(totalMultas), 'IVA incluido'),
-    kpiCard('Avance de certificación', avanceCertProm.toFixed(1) + '%', 'promedio sobre trámites con dato'),
+    kpiCard('Avance de certificación', avanceCertificacion.toFixed(1) + '%', 'certificado / adjudicado'),
   ].join('');
 
   // ---- Gráfico 1: Presupuesto Oficial vs Adjudicado vs Certificado, por Sucursal ----
