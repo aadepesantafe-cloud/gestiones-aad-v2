@@ -47,7 +47,8 @@ const state = {
   etapas: [],
   registros: [],
   filtros: {},
-  dashFiltros: {},
+  dashFiltros: { fechaPCDesde: '', fechaPCHasta: '' },
+  riesgoPlazoActivo: false,
   editingId: null,
   activeStage: null
 };
@@ -540,12 +541,62 @@ document.getElementById('clearFilters').addEventListener('click', () => {
 
 document.getElementById('dashClearFilters').addEventListener('click', () => {
   DASH_FILTER_KEYS.forEach(k => { state.dashFiltros[k] = []; });
+  state.dashFiltros.fechaPCDesde = '';
+  state.dashFiltros.fechaPCHasta = '';
+  document.getElementById('dashFechaPCDesde').value = '';
+  document.getElementById('dashFechaPCHasta').value = '';
+  state.riesgoPlazoActivo = false;
+  document.getElementById('riesgoPlazoBtn').classList.remove('active');
   populateFilterOptions();
   renderDashboard();
 });
 
+document.getElementById('dashFechaPCDesde').addEventListener('change', (e) => {
+  state.dashFiltros.fechaPCDesde = e.target.value;
+  renderDashboard();
+});
+document.getElementById('dashFechaPCHasta').addEventListener('change', (e) => {
+  state.dashFiltros.fechaPCHasta = e.target.value;
+  renderDashboard();
+});
+document.getElementById('riesgoPlazoBtn').addEventListener('click', () => {
+  state.riesgoPlazoActivo = !state.riesgoPlazoActivo;
+  document.getElementById('riesgoPlazoBtn').classList.toggle('active', state.riesgoPlazoActivo);
+  renderDashboard();
+});
+
+// ---- Criterio de "Riesgo por Plazo": vencido o vence en <=30 días, y no está Finalizado ----
+const DIAS_RIESGO = 30;
+function esRiesgoPorPlazo(r) {
+  if (r.estado === 'Finalizado') return false;
+  const fechaLimite = r.fechaFinPlazoAmpliada || r.fechaFinContrato;
+  if (!fechaLimite) return false;
+  const dLimite = new Date(fechaLimite + 'T00:00:00');
+  if (isNaN(dLimite.getTime())) return false;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diffDias = (dLimite - hoy) / (1000 * 60 * 60 * 24);
+  return diffDias <= DIAS_RIESGO;
+}
+
+function filteredForDashboardBase() {
+  let rows = applyFilters(state.registros, state.dashFiltros, DASH_FILTER_KEYS);
+  const desde = state.dashFiltros.fechaPCDesde;
+  const hasta = state.dashFiltros.fechaPCHasta;
+  if (desde || hasta) {
+    rows = rows.filter(r => {
+      const v = r.fechaPedidoCompras;
+      if (!v) return false;
+      if (desde && v < desde) return false;
+      if (hasta && v > hasta) return false;
+      return true;
+    });
+  }
+  return rows;
+}
+
 function filteredForDashboard() {
-  return applyFilters(state.registros, state.dashFiltros, DASH_FILTER_KEYS);
+  const rows = filteredForDashboardBase();
+  return state.riesgoPlazoActivo ? rows.filter(esRiesgoPorPlazo) : rows;
 }
 
 function applyFilters(rows, filtros, keys) {
@@ -659,6 +710,10 @@ function semColor(pct) {
 function renderDashboard() {
   const groupKey = document.getElementById('dashGroupBy').value;
   const rows = filteredForDashboard();
+
+  // ---- Badge de "Riesgo por Plazo": cuenta sobre el resto de los filtros, sin aplicar el toggle de riesgo ----
+  const riesgoCount = filteredForDashboardBase().filter(esRiesgoPorPlazo).length;
+  document.getElementById('riesgoPlazoBadge').textContent = riesgoCount;
 
   // ---- KPIs generales (montos en millones, 2 decimales) ----
   const totalPresOficial = sumField(rows, 'presupuestoOficialRubro');
