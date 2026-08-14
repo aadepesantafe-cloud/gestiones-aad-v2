@@ -228,6 +228,9 @@ async function boot() {
   document.getElementById('app').hidden = false;
   document.getElementById('userName').textContent = state.session.nombre + ' (' + state.session.rol + ')';
   document.getElementById('navUsuarios').hidden = state.session.rol !== 'admin';
+  const puedeEditar = state.session.rol !== 'consulta';
+  const navFormulario = document.querySelector('.nav-btn[data-view="formulario"]');
+  if (navFormulario) navFormulario.hidden = !puedeEditar;
   hideAppError();
 
   try {
@@ -810,6 +813,7 @@ function renderRegistros() {
   document.getElementById('resultsCount').textContent = rows.length + ' trámite(s) encontrados de ' + state.registros.length + ' totales.';
   const table = document.getElementById('recordsTable');
   const isAdmin = state.session && state.session.rol === 'admin';
+  const puedeEditar = state.session && state.session.rol !== 'consulta';
   const thead = '<thead><tr>' + REGISTROS_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th class="col-sticky">Acciones</th></tr></thead>';
   const tbody = '<tbody>' + rows.map(r => {
     const tds = REGISTROS_COLS.map(c => {
@@ -829,17 +833,19 @@ function renderRegistros() {
     }).join('');
     const acciones = `<td class="row-actions col-sticky">
         <button class="icon-btn" data-action="copiar" title="Copiar datos">📋</button>
-        <button class="icon-btn" data-action="clonar" title="Clonar trámite">🧬</button>
+        ${puedeEditar ? '<button class="icon-btn" data-action="clonar" title="Clonar trámite">🧬</button>' : ''}
         ${isAdmin ? '<button class="icon-btn danger" data-action="eliminar" title="Eliminar trámite">🗑️</button>' : ''}
       </td>`;
     return `<tr data-id="${r._id}">${tds}${acciones}</tr>`;
   }).join('') + '</tbody>';
   table.innerHTML = thead + tbody;
+  table.classList.toggle('solo-consulta', !puedeEditar);
   setupScrollShadow(table.closest('.table-wrap'));
 
   table.querySelectorAll('tbody tr').forEach(tr => {
     tr.addEventListener('click', (e) => {
       if (e.target.closest('.row-actions')) return; // los botones de acción no abren el formulario
+      if (!puedeEditar) return; // solo consulta: no se abre el formulario de edición
       const rec = state.registros.find(r => r._id === tr.dataset.id);
       if (rec) openRecordForEdit(rec);
     });

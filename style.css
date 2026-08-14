@@ -353,6 +353,7 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 }
 .data-table td{ padding:9px 14px; border-bottom:1px solid var(--border); font-family:var(--font-mono); }
 .data-table tbody tr:hover{ background:var(--brand-soft); cursor:pointer; }
+.data-table.solo-consulta tbody tr:hover{ background:transparent; cursor:default; }
 .data-table tr.dash-table-total{ font-weight:700; background:#F8FAFB; }
 .data-table tr.dash-table-total td{ border-top:2px solid var(--border); cursor:default; }
 .data-table tr.dash-table-total:hover{ background:#F8FAFB; }
