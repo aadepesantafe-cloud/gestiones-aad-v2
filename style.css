@@ -206,6 +206,36 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 #chartCertificacion{ height:380px !important; }
 #chartCertificacionPC{ height:380px !important; }
 
+/* ============ RESUMEN POR CONTRATISTA ============ */
+.btn-toggle-active{ background:var(--brand); color:#fff; border-color:var(--brand); }
+.contratista-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
+.contratista-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:14px 16px; position:relative;
+}
+.contratista-card .rank{ font-size:11px; font-weight:700; color:var(--text-soft); }
+.contratista-card .name{ font-weight:600; font-size:13px; margin:2px 26px 10px 0; line-height:1.3; }
+.contratista-card .row-line{ display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--text-soft); margin-bottom:3px; }
+.contratista-card .row-line b{ color:var(--text); font-family:var(--font-mono); font-weight:600; }
+.contratista-card .avance-bar-wrap{ height:6px; background:#F1F5F9; border-radius:99px; margin:9px 0 7px; overflow:hidden; }
+.contratista-card .avance-bar{ height:100%; border-radius:99px; }
+.contratista-card .semaforo{ position:absolute; top:14px; right:14px; font-size:14px; }
+
+/* ============ IMPRESIÓN A PDF ============ */
+.print-header{ display:none; }
+@media print {
+  .sidebar{ display:none !important; }
+  .main-area{ height:auto !important; overflow:visible !important; }
+  .content{ max-width:100% !important; padding:0 12px !important; }
+  #appError{ display:none !important; }
+  #view-dashboard .control-inline, #dashClearFilters{ display:none !important; }
+  .print-header{ display:block !important; margin-bottom:14px; }
+  .print-title{ margin:0; font-size:16px; font-weight:700; }
+  .print-subtitle{ margin:2px 0 0; font-size:11px; color:var(--text-soft); }
+  .panel, .kpi-card, .contratista-card{ box-shadow:none !important; border:1px solid #ccc !important; break-inside:avoid; }
+  body{ background:#fff !important; }
+}
+
 .chart-grid{ display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-bottom:16px; }
 @media (max-width:900px){ .chart-grid{ grid-template-columns:1fr; } }
 

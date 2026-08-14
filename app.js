@@ -787,6 +787,9 @@ function renderDashboard() {
     }
   });
 
+  // ---- Resumen por Contratista (tarjetas con semáforo) ----
+  renderContratistaResumen(rows);
+
   // ---- Tabla de detalle (según "Agrupar por") ----
   const groups = {};
   rows.forEach(r => {
@@ -804,6 +807,82 @@ function renderDashboard() {
     '<tbody>' + entries.map(([k, v]) =>
       `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td></tr>`
     ).join('') + '</tbody>';
+}
+
+let contratistaMode = 'top10';
+
+document.getElementById('contratistaTop10Btn').addEventListener('click', () => {
+  contratistaMode = 'top10';
+  toggleContratistaButtons();
+  renderDashboard();
+});
+document.getElementById('contratistaTodosBtn').addEventListener('click', () => {
+  contratistaMode = 'todos';
+  toggleContratistaButtons();
+  renderDashboard();
+});
+function toggleContratistaButtons() {
+  document.getElementById('contratistaTop10Btn').classList.toggle('btn-toggle-active', contratistaMode === 'top10');
+  document.getElementById('contratistaTodosBtn').classList.toggle('btn-toggle-active', contratistaMode === 'todos');
+}
+
+document.getElementById('printDashboardBtn').addEventListener('click', () => {
+  document.getElementById('printDate').textContent = new Date().toLocaleString('es-AR');
+  window.print();
+});
+
+function renderContratistaResumen(rows) {
+  const byContratista = {};
+  rows.forEach(r => {
+    if (!r.adjudicatario) return;
+    const key = r.adjudicatario.trim();
+    if (!byContratista[key]) byContratista[key] = { adjudicado: 0, certificado: 0, n: 0 };
+    byContratista[key].adjudicado += num(r.totalAdjudicado);
+    byContratista[key].certificado += num(r.certificadosAAD);
+    byContratista[key].n++;
+  });
+
+  const entries = Object.entries(byContratista).map(([nombre, v]) => ({
+    nombre,
+    adjudicado: v.adjudicado,
+    certificado: v.certificado,
+    n: v.n,
+    pendiente: v.adjudicado - v.certificado,
+    avance: v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0
+  })).sort((a, b) => b.adjudicado - a.adjudicado);
+
+  const totalAdj = entries.reduce((s, c) => s + c.adjudicado, 0);
+  const totalCert = entries.reduce((s, c) => s + c.certificado, 0);
+  const avanceGeneral = totalAdj > 0 ? (totalCert / totalAdj) * 100 : 0;
+  const mayorCert = entries.length ? entries.slice().sort((a, b) => b.certificado - a.certificado)[0] : null;
+  const conAdjudicado = entries.filter(c => c.adjudicado > 0);
+  const menorAvance = conAdjudicado.length ? conAdjudicado.slice().sort((a, b) => a.avance - b.avance)[0] : null;
+
+  document.getElementById('contratistaKpiRow').innerHTML = [
+    kpiCard('Contratistas', entries.length, ''),
+    kpiCard('Total Adjudicado', formatMillions(totalAdj), ''),
+    kpiCard('Total Certificado', formatMillions(totalCert), ''),
+    kpiCard('Avance General', avanceGeneral.toFixed(1) + '%', ''),
+    kpiCard('Mayor Certificación', mayorCert ? mayorCert.nombre : '—', mayorCert ? formatMillions(mayorCert.certificado) : ''),
+    kpiCard('Menor Avance', menorAvance ? menorAvance.nombre : '—', menorAvance ? menorAvance.avance.toFixed(1) + '%' : ''),
+  ].join('');
+
+  const shown = contratistaMode === 'top10' ? entries.slice(0, 10) : entries;
+  const grid = document.getElementById('contratistaGrid');
+  grid.innerHTML = shown.length ? shown.map((c, idx) => {
+    const semaforo = c.avance >= 75 ? '🟢' : (c.avance >= 40 ? '🟡' : '🔴');
+    const barColor = c.avance >= 75 ? '#16A34A' : (c.avance >= 40 ? '#D97706' : '#DC2626');
+    return `<div class="contratista-card">
+      <span class="semaforo">${semaforo}</span>
+      <div class="rank">#${idx + 1}</div>
+      <div class="name">${escapeHtml(c.nombre)}</div>
+      <div class="row-line"><span>Adjudicado</span><b>${formatMillions(c.adjudicado)}</b></div>
+      <div class="row-line"><span>Certificado</span><b>${formatMillions(c.certificado)}</b></div>
+      <div class="avance-bar-wrap"><div class="avance-bar" style="width:${Math.min(c.avance,100)}%;background:${barColor}"></div></div>
+      <div class="row-line"><span>Avance</span><b>${c.avance.toFixed(1)}%</b></div>
+      <div class="row-line"><span>${c.n} contrato${c.n === 1 ? '' : 's'}</span><span>Pend: ${formatMillions(c.pendiente)}</span></div>
+    </div>`;
+  }).join('') : '<div class="empty-state">Sin contratistas para este filtro.</div>';
 }
 
 function labelForGroup(key) {
@@ -851,6 +930,27 @@ document.getElementById('userForm').addEventListener('submit', async (e) => {
     msg.hidden = false;
     document.getElementById('userForm').reset();
     renderUsuarios();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'form-msg err';
+    msg.hidden = false;
+  }
+});
+
+// ---- Completar valores iniciales faltantes (una sola vez, base original) ----
+document.getElementById('completarBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('completarMsg');
+  msg.hidden = true;
+  const confirmado = confirm('Esto va a completar Cantidades/IIBB, $ Pres. Oficial Unitario, $ Adjudicado Unitario y $ Total Adjudicado SOLO en los trámites donde esos 4 campos estén vacíos, usando el Presupuesto Oficial ya cargado. No modifica trámites que ya tengan esos datos. ¿Continuar?');
+  if (!confirmado) return;
+  try {
+    const r = await apiCall('completar_valores_iniciales');
+    msg.textContent = 'Listo: se completaron ' + r.completados + ' trámites.';
+    msg.className = 'form-msg ok';
+    msg.hidden = false;
+    const data = await apiCall('listar');
+    state.registros = data.registros;
+    populateFilterOptions();
   } catch (err) {
     msg.textContent = 'Error: ' + err.message;
     msg.className = 'form-msg err';

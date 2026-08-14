@@ -95,6 +95,7 @@
               <option value="adjudicatario">Contratista/Proveedor</option>
             </select>
           </label>
+          <button id="printDashboardBtn" class="btn btn-secondary">Imprimir a PDF</button>
         </div>
       </div>
 
@@ -130,6 +131,11 @@
         <button id="dashClearFilters" class="btn btn-ghost">Limpiar filtros</button>
       </div>
 
+      <div class="print-header">
+        <p class="print-title">Gestiones AAD — Dashboard de seguimiento</p>
+        <p class="print-subtitle">Impreso el <span id="printDate"></span></p>
+      </div>
+
       <div class="kpi-row" id="kpiRow"></div>
 
       <div class="panel">
@@ -144,6 +150,18 @@
         <h3>% de Certificación por Pedido de Compras</h3>
         <canvas id="chartCertificacionPC" height="130"></canvas>
       </div>
+      <div class="panel">
+        <div class="view-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Resumen por Contratista</h3>
+          <div class="control-inline">
+            <button id="contratistaTop10Btn" class="btn btn-ghost btn-toggle-active" data-mode="top10">Top 10</button>
+            <button id="contratistaTodosBtn" class="btn btn-ghost" data-mode="todos">Todos</button>
+          </div>
+        </div>
+        <div class="kpi-row" id="contratistaKpiRow"></div>
+        <div class="contratista-grid" id="contratistaGrid"></div>
+      </div>
+
       <div class="panel">
         <h3>Detalle por agrupación</h3>
         <div class="table-wrap">
@@ -253,6 +271,19 @@
       </div>
       <div class="table-wrap">
         <table id="usersTable" class="data-table"></table>
+      </div>
+
+      <div class="panel" style="max-width:520px">
+        <h3>Completar valores iniciales faltantes</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">
+          Completa <strong>Cantidades/IIBB</strong> (= 1), <strong>$ Pres. Oficial Unitario</strong> y
+          <strong>$ Adjudicado Unitario</strong> (= Presupuesto Oficial ya cargado), y recalcula
+          <strong>$ Total Adjudicado</strong> — pero <u>solo</u> en los trámites donde esos 4 campos
+          estén vacíos. No pisa datos que ya existan. Usalo una sola vez para completar la base
+          original; después esos valores se cargan normalmente desde el formulario.
+        </p>
+        <button id="completarBtn" class="btn btn-secondary">Completar valores faltantes</button>
+        <p id="completarMsg" class="form-msg" hidden></p>
       </div>
 
       <div class="panel" style="max-width:520px">
