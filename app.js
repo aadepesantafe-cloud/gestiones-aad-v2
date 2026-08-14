@@ -272,8 +272,11 @@ function buildForm(record) {
   lifeline.innerHTML = '';
   panelsWrap.innerHTML = '';
 
-  const rubroVal = (record.rubro || '').toLowerCase();
-  const isOM = rubroVal.includes('obra menor') || rubroVal === 'om';
+  const isObraMenorPospre = (val) => {
+    const v = (val || '').toLowerCase();
+    return v.includes('o.d.s') || v.includes('o.d.p') || v.includes('ods') || v.includes('odp');
+  };
+  const isOM = isObraMenorPospre(record.pospre);
 
   state.etapas.forEach((etapa, idx) => {
     const isProyectos = etapa.id === 'proyectos';
@@ -301,7 +304,7 @@ function buildForm(record) {
     const title = document.createElement('div');
     title.className = 'stage-panel-title';
     title.innerHTML = `<span class="dot" style="background:${stageColorVar(idx)}"></span> ${etapa.label}` +
-      (isProyectos ? ' <span style="font-weight:400;color:var(--text-soft);font-size:12px;">(solo aplica a Obra Menor)</span>' : '');
+      (isProyectos ? ' <span style="font-weight:400;color:var(--text-soft);font-size:12px;">(solo aplica a Pospre O.D.P. / O.D.S. — Obra Menor)</span>' : '');
     panel.appendChild(title);
 
     const grid = document.createElement('div');
@@ -313,12 +316,11 @@ function buildForm(record) {
     panelsWrap.appendChild(panel);
   });
 
-  // Si cambia el rubro dinámicamente, re-evaluar si Proyectos aplica
-  const rubroInput = panelsWrap.querySelector('[name="rubro"]');
-  if (rubroInput) {
-    rubroInput.addEventListener('input', () => {
-      const val = rubroInput.value.toLowerCase();
-      const om = val.includes('obra menor') || val === 'om';
+  // Si cambia el Pospre elegido, re-evaluar si Proyectos aplica (solo O.D.P / O.D.S = Obra Menor)
+  const pospreInput = panelsWrap.querySelector('[name="pospre"]');
+  if (pospreInput) {
+    pospreInput.addEventListener('change', () => {
+      const om = isObraMenorPospre(pospreInput.value);
       const proyNode = lifeline.querySelector('[data-stage="proyectos"]');
       const proyPanel = document.getElementById('panel-proyectos');
       proyNode.classList.toggle('disabled', !om);
