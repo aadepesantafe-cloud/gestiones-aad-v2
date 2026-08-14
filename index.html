@@ -289,6 +289,25 @@
         <table id="usersTable" class="data-table"></table>
       </div>
 
+      <div class="panel" style="max-width:640px">
+        <h3>Unificar valores duplicados</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">
+          Busca variantes de escritura del mismo Pospre o la misma Sucursal (mayúsculas/minúsculas,
+          puntos, espacios de más, etc.) y te deja elegir cuál es la versión correcta para unificarlas.
+          No unifica nada automáticamente — vos revisás cada grupo antes de aplicar.
+        </p>
+        <div class="control-inline" style="margin-bottom:14px;">
+          <label>Campo
+            <select id="unificarCampo">
+              <option value="pospre">Pospre</option>
+              <option value="sucursal">Sucursal</option>
+            </select>
+          </label>
+          <button id="buscarDuplicadosBtn" class="btn btn-secondary">Buscar duplicados</button>
+        </div>
+        <div id="duplicadosResultado"></div>
+      </div>
+
       <div class="panel" style="max-width:520px;border-color:#FCA5A5;">
         <h3 style="color:var(--danger);">⚠ Corrección de IVA (una sola vez)</h3>
         <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">

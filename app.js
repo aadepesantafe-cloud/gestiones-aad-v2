@@ -1074,12 +1074,18 @@ function renderDashboard() {
   const groups = {};
   rows.forEach(r => {
     const key = (r[groupKey] || '(sin dato)').toString().trim() || '(sin dato)';
-    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0 };
+    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0, certProcesados:0, proyectos:0, pctIIBBValores:[] };
     groups[key].n++;
     groups[key].presOficial += num(r.presupuestoOficialRubro);
     groups[key].adjudicado += num(r.totalAdjudicado);
     groups[key].certificado += num(r.certificadosAAD);
+    groups[key].certProcesados += num(r.cantidadCertificadosProcesados);
+    groups[key].proyectos += num(r.cantidadProyectos);
+    const pctIIBB = num(r.pctIIBBProyectados);
+    if (pctIIBB > 0) groups[key].pctIIBBValores.push(pctIIBB);
   });
+  const promedioPctIIBB = (v) => v.pctIIBBValores.length ? v.pctIIBBValores.reduce((a,b) => a+b, 0) / v.pctIIBBValores.length : 0;
+
   const allEntries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial);
   const entries = allEntries.slice(0, 12);
   const hayMasGrupos = allEntries.length > entries.length;
@@ -1087,17 +1093,19 @@ function renderDashboard() {
   // Totales sobre TODOS los grupos (no solo los 12 que se muestran), para que coincida con los KPIs de arriba
   const totalGeneral = allEntries.reduce((acc, [, v]) => {
     acc.n += v.n; acc.presOficial += v.presOficial; acc.adjudicado += v.adjudicado; acc.certificado += v.certificado;
+    acc.certProcesados += v.certProcesados; acc.proyectos += v.proyectos; acc.pctIIBBValores = acc.pctIIBBValores.concat(v.pctIIBBValores);
     return acc;
-  }, { n:0, presOficial:0, adjudicado:0, certificado:0 });
+  }, { n:0, presOficial:0, adjudicado:0, certificado:0, certProcesados:0, proyectos:0, pctIIBBValores:[] });
   const avanceGeneral = totalGeneral.adjudicado > 0 ? (totalGeneral.certificado / totalGeneral.adjudicado) * 100 : 0;
+  const promedioPctIIBBGeneral = promedioPctIIBB(totalGeneral);
 
   const table = document.getElementById('dashTable');
-  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th></tr></thead>' +
+  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th><th>Cant. Certificados Proc.</th><th>Cant. Proyectos</th><th>% IIBB Proyectados</th></tr></thead>' +
     '<tbody>' + entries.map(([k, v]) => {
       const avanceGrupo = v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0;
-      return `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td></tr>`;
+      return `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td><td>${v.certProcesados}</td><td>${v.proyectos}</td><td>${promedioPctIIBB(v).toFixed(1)}%</td></tr>`;
     }).join('') +
-    `<tr class="dash-table-total"><td>TOTAL${hayMasGrupos ? ' (' + allEntries.length + ' grupos)' : ''}</td><td>${totalGeneral.n}</td><td>${formatMillions(totalGeneral.presOficial)}</td><td>${formatMillions(totalGeneral.adjudicado)}</td><td>${formatMillions(totalGeneral.certificado)}</td><td>${avanceGeneral.toFixed(1)}%</td></tr>` +
+    `<tr class="dash-table-total"><td>TOTAL${hayMasGrupos ? ' (' + allEntries.length + ' grupos)' : ''}</td><td>${totalGeneral.n}</td><td>${formatMillions(totalGeneral.presOficial)}</td><td>${formatMillions(totalGeneral.adjudicado)}</td><td>${formatMillions(totalGeneral.certificado)}</td><td>${avanceGeneral.toFixed(1)}%</td><td>${totalGeneral.certProcesados}</td><td>${totalGeneral.proyectos}</td><td>${promedioPctIIBBGeneral.toFixed(1)}%</td></tr>` +
     '</tbody>';
 
   const nota = document.getElementById('dashTableNota');
@@ -1224,6 +1232,87 @@ document.getElementById('userForm').addEventListener('submit', async (e) => {
 
 // ---- Completar valores iniciales faltantes (una sola vez, base original) ----
 // ---- Corrección de IVA (una sola vez, doble confirmación por ser una operación sensible) ----
+// ---- Unificar valores duplicados (Pospre / Sucursal) ----
+function normalizeForDupe(v) {
+  return String(v || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildDupeClusters(key) {
+  const map = {};
+  state.registros.forEach(r => {
+    const raw = (r[key] || '').toString().trim();
+    if (!raw) return;
+    const norm = normalizeForDupe(raw);
+    if (!map[norm]) map[norm] = {};
+    map[norm][raw] = (map[norm][raw] || 0) + 1;
+  });
+  return Object.values(map)
+    .map(variants => Object.entries(variants).sort((a, b) => b[1] - a[1])) // [[valor,count],...] desc
+    .filter(variants => variants.length > 1) // solo grupos con más de una variante = posibles duplicados
+    .sort((a, b) => b.reduce((s, v) => s + v[1], 0) - a.reduce((s, v) => s + v[1], 0));
+}
+
+document.getElementById('buscarDuplicadosBtn').addEventListener('click', () => {
+  const campo = document.getElementById('unificarCampo').value;
+  const clusters = buildDupeClusters(campo);
+  const cont = document.getElementById('duplicadosResultado');
+
+  if (!clusters.length) {
+    cont.innerHTML = '<p class="form-msg ok" style="display:block;">No se encontraron variantes duplicadas para este campo. 👍</p>';
+    return;
+  }
+
+  cont.innerHTML = clusters.map((variants, idx) => {
+    const total = variants.reduce((s, v) => s + v[1], 0);
+    const opciones = variants.map(([valor, count], i) =>
+      `<label class="dupe-option">
+        <input type="radio" name="dupe-${idx}" value="${escapeHtml(valor)}" ${i === 0 ? 'checked' : ''}/>
+        <span>${escapeHtml(valor)}</span> <span class="dupe-count">(${count} trámite${count === 1 ? '' : 's'})</span>
+      </label>`
+    ).join('');
+    return `<div class="dupe-cluster" data-idx="${idx}">
+      <p class="dupe-cluster-title">Grupo de ${variants.length} variantes — ${total} trámites en total</p>
+      ${opciones}
+      <button type="button" class="btn btn-secondary dupe-unify-btn" data-idx="${idx}">Unificar este grupo</button>
+      <p class="form-msg" data-msg-idx="${idx}" hidden></p>
+    </div>`;
+  }).join('');
+
+  cont.querySelectorAll('.dupe-unify-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = btn.dataset.idx;
+      const cluster = clusters[idx];
+      const elegido = cont.querySelector('input[name="dupe-' + idx + '"]:checked').value;
+      const valoresViejos = cluster.map(v => v[0]).filter(v => v !== elegido);
+      const msg = cont.querySelector('[data-msg-idx="' + idx + '"]');
+      msg.hidden = true;
+
+      const confirmado = confirm('Se van a reemplazar estas variantes:\n\n' + valoresViejos.join('\n') + '\n\npor:\n\n"' + elegido + '"\n\n¿Confirmás?');
+      if (!confirmado) return;
+
+      try {
+        const r = await apiCall('unificar_valores', { campo, valoresViejos, valorNuevo: elegido });
+        msg.textContent = 'Listo: se actualizaron ' + r.actualizados + ' trámites.';
+        msg.className = 'form-msg ok';
+        msg.hidden = false;
+        btn.disabled = true;
+        const data = await apiCall('listar');
+        state.registros = data.registros;
+        populateFilterOptions();
+      } catch (err) {
+        msg.textContent = 'Error: ' + err.message;
+        msg.className = 'form-msg err';
+        msg.hidden = false;
+      }
+    });
+  });
+});
+
 document.getElementById('corregirIvaBtn').addEventListener('click', async () => {
   const msg = document.getElementById('corregirIvaMsg');
   msg.hidden = true;

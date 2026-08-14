@@ -432,3 +432,13 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 
 /* ============ EMPTY / MISC ============ */
 .empty-state{ padding:40px; text-align:center; color:var(--text-soft); }
+
+/* ============ UNIFICAR DUPLICADOS ============ */
+.dupe-cluster{
+  border:1px solid var(--border); border-radius:9px; padding:14px 16px; margin-bottom:12px; background:#FAFBFC;
+}
+.dupe-cluster-title{ margin:0 0 10px; font-size:12.5px; font-weight:700; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.02em; }
+.dupe-option{ display:flex; align-items:center; gap:8px; padding:5px 2px; font-size:13.5px; cursor:pointer; }
+.dupe-option input{ flex-shrink:0; }
+.dupe-count{ color:var(--text-soft); font-size:12px; }
+.dupe-unify-btn{ margin-top:8px; }
