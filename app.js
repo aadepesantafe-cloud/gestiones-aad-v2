@@ -470,10 +470,13 @@ function renderMultiselect(el, options, selected, onChange) {
   el.innerHTML =
     '<button type="button" class="ms-toggle"><span class="ms-toggle-label">' + escapeHtml(msLabel(selected)) + '</span><span class="ms-caret">▾</span></button>' +
     '<div class="ms-panel">' +
+      (options.length > 6 ? '<input type="text" class="ms-search" placeholder="Buscar..." />' : '') +
       '<button type="button" class="ms-clear">Limpiar selección</button>' +
+      '<div class="ms-options">' +
       (options.length
         ? options.map(o => '<label class="ms-option"><input type="checkbox" value="' + escapeHtml(o) + '" ' + (sel.has(o) ? 'checked' : '') + '/><span>' + escapeHtml(o) + '</span></label>').join('')
         : '<div class="ms-empty">Sin opciones</div>') +
+      '</div>' +
     '</div>';
 
   if (!el.dataset.wired) {
@@ -484,11 +487,22 @@ function renderMultiselect(el, options, selected, onChange) {
         const willOpen = !el.classList.contains('open');
         closeAllMultiselects(el);
         el.classList.toggle('open', willOpen);
+        const search = el.querySelector('.ms-search');
+        if (willOpen && search) {
+          search.value = '';
+          filtrarOpcionesMultiselect(el, '');
+          setTimeout(() => search.focus(), 0);
+        }
       } else if (e.target.closest('.ms-clear')) {
         el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
         const label = el.querySelector('.ms-toggle-label');
         if (label) label.textContent = 'Todos';
         el._msOnChange && el._msOnChange([]);
+      }
+    });
+    el.addEventListener('input', (e) => {
+      if (e.target.matches('.ms-search')) {
+        filtrarOpcionesMultiselect(el, e.target.value);
       }
     });
     el.addEventListener('change', (e) => {
@@ -501,6 +515,15 @@ function renderMultiselect(el, options, selected, onChange) {
     });
   }
   el._msOnChange = onChange; // siempre apunta al callback más reciente
+}
+
+// ---- Filtra visualmente las opciones de un multiselect según el texto buscado (sin tocar la selección) ----
+function filtrarOpcionesMultiselect(el, query) {
+  const q = query.trim().toLowerCase();
+  el.querySelectorAll('.ms-option').forEach(opt => {
+    const texto = opt.textContent.trim().toLowerCase();
+    opt.style.display = (!q || texto.includes(q)) ? '' : 'none';
+  });
 }
 
 function populateFilterOptions() {

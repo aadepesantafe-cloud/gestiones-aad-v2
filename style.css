@@ -301,18 +301,26 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 
 .ms-panel{
   position:absolute; top:calc(100% + 4px); left:0; z-index:30;
-  min-width:220px; max-height:260px; overflow-y:auto;
+  min-width:220px; max-height:300px;
   background:#fff; border:1px solid var(--border); border-radius:9px;
   box-shadow:0 10px 30px rgba(3,20,28,0.15);
   padding:6px;
+  display:flex; flex-direction:column;
 }
 .multiselect:not(.open) .ms-panel{ display:none; }
+.ms-search{
+  width:100%; padding:6px 9px; margin-bottom:5px;
+  border:1px solid var(--border); border-radius:6px; font-size:12.5px; color:var(--text);
+  flex-shrink:0;
+}
+.ms-search:focus{ outline:2px solid var(--brand); outline-offset:1px; }
 .ms-clear{
   display:block; width:100%; text-align:left; background:none; border:none;
   padding:6px 8px; font-size:12px; font-weight:600; color:var(--brand);
-  border-bottom:1px solid var(--border); margin-bottom:4px; cursor:pointer;
+  border-bottom:1px solid var(--border); margin-bottom:4px; cursor:pointer; flex-shrink:0;
 }
 .ms-clear:hover{ background:var(--brand-soft); border-radius:6px 6px 0 0; }
+.ms-options{ overflow-y:auto; }
 .ms-option{
   display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px;
   font-size:13px; font-weight:400; color:var(--text); cursor:pointer; white-space:nowrap;
