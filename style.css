@@ -330,6 +330,11 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   pointer-events:none; opacity:1; transition:opacity .2s; border-radius:0 var(--radius) var(--radius) 0;
 }
 .table-wrap.scrolled-end::after{ opacity:0; }
+
+/* Barra de scroll horizontal duplicada arriba de la tabla (sincronizada) */
+.scroll-top-bar{ overflow-x:auto; overflow-y:hidden; height:14px; margin-bottom:6px; }
+.scroll-top-inner{ height:1px; }
+
 .data-table{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
 .data-table th{
   text-align:left; padding:10px 14px; background:#F8FAFB; color:var(--text-soft);

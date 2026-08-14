@@ -679,7 +679,8 @@ function renderRegistros() {
   });
 }
 
-// ---- Oculta la sombra de "hay más contenido" cuando el scroll horizontal llega al final ----
+// ---- Oculta la sombra de "hay más contenido" cuando el scroll horizontal llega al final,
+//      y sincroniza la barra de scroll duplicada de arriba con la tabla de abajo ----
 function setupScrollShadow(wrap) {
   if (!wrap) return;
   function update() {
@@ -691,6 +692,28 @@ function setupScrollShadow(wrap) {
     wrap.dataset.scrollWired = '1';
     wrap.addEventListener('scroll', update);
     window.addEventListener('resize', update);
+  }
+
+  // Barra superior duplicada (solo aplica a la tabla de Registros, que es la que puede ser muy ancha)
+  const topBar = document.getElementById('recordsScrollTop');
+  const topInner = document.getElementById('recordsScrollTopInner');
+  if (topBar && topInner && wrap.querySelector('#recordsTable')) {
+    topInner.style.width = wrap.scrollWidth + 'px';
+    if (!topBar.dataset.scrollWired) {
+      topBar.dataset.scrollWired = '1';
+      let syncing = false;
+      topBar.addEventListener('scroll', () => {
+        if (syncing) return; syncing = true;
+        wrap.scrollLeft = topBar.scrollLeft;
+        syncing = false;
+      });
+      wrap.addEventListener('scroll', () => {
+        if (syncing) return; syncing = true;
+        topBar.scrollLeft = wrap.scrollLeft;
+        syncing = false;
+      });
+      window.addEventListener('resize', () => { topInner.style.width = wrap.scrollWidth + 'px'; });
+    }
   }
 }
 
