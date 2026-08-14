@@ -368,6 +368,15 @@ function recalcDerivedFields() {
   const certificado = parseFloat(getFormValue('certificadosAAD')) || 0;
   const pct = totalAdj > 0 ? (certificado / totalAdj) * 100 : 0;
   setFormValue('pctAvanceCertificacion', pct ? pct.toFixed(2) : '');
+
+  // Aviso visual: un % de avance fuera de rango razonable casi siempre indica un dato mal
+  // cargado en Cantidad/IIBB o $ Adjudicado Unitario (no un error de fórmula).
+  const pctEl = document.querySelector('#stagePanels [name="pctAvanceCertificacion"]');
+  if (pctEl) {
+    const fueraDeRango = pct > 200 || pct < 0;
+    pctEl.classList.toggle('valor-sospechoso', fueraDeRango);
+    pctEl.title = fueraDeRango ? 'Este % parece incorrecto. Revisá Cantidad/IIBB y $ Adjudicado Unitario de este trámite.' : '';
+  }
 }
 document.getElementById('stagePanels').addEventListener('input', (e) => {
   if (e.target.name && RECALC_TRIGGER_FIELDS.has(e.target.name)) {
@@ -1071,14 +1080,33 @@ function renderDashboard() {
     groups[key].adjudicado += num(r.totalAdjudicado);
     groups[key].certificado += num(r.certificadosAAD);
   });
-  const entries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial).slice(0, 12);
+  const allEntries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial);
+  const entries = allEntries.slice(0, 12);
+  const hayMasGrupos = allEntries.length > entries.length;
+
+  // Totales sobre TODOS los grupos (no solo los 12 que se muestran), para que coincida con los KPIs de arriba
+  const totalGeneral = allEntries.reduce((acc, [, v]) => {
+    acc.n += v.n; acc.presOficial += v.presOficial; acc.adjudicado += v.adjudicado; acc.certificado += v.certificado;
+    return acc;
+  }, { n:0, presOficial:0, adjudicado:0, certificado:0 });
+  const avanceGeneral = totalGeneral.adjudicado > 0 ? (totalGeneral.certificado / totalGeneral.adjudicado) * 100 : 0;
 
   const table = document.getElementById('dashTable');
   table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th></tr></thead>' +
     '<tbody>' + entries.map(([k, v]) => {
       const avanceGrupo = v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0;
       return `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td></tr>`;
-    }).join('') + '</tbody>';
+    }).join('') +
+    `<tr class="dash-table-total"><td>TOTAL${hayMasGrupos ? ' (' + allEntries.length + ' grupos)' : ''}</td><td>${totalGeneral.n}</td><td>${formatMillions(totalGeneral.presOficial)}</td><td>${formatMillions(totalGeneral.adjudicado)}</td><td>${formatMillions(totalGeneral.certificado)}</td><td>${avanceGeneral.toFixed(1)}%</td></tr>` +
+    '</tbody>';
+
+  const nota = document.getElementById('dashTableNota');
+  if (nota) {
+    nota.textContent = hayMasGrupos
+      ? `Se muestran los 12 grupos con mayor Presupuesto Oficial, de ${allEntries.length} en total. La fila TOTAL suma los ${allEntries.length}, no solo los 12 visibles.`
+      : '';
+    nota.hidden = !hayMasGrupos;
+  }
 }
 
 let contratistaMode = 'top10';
