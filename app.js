@@ -37,9 +37,11 @@ const DYNAMIC_SELECT_FIELDS = new Set(['pospre']);
 const LONG_FIELDS = new Set(['detalleRubro','observaciones']);
 
 // ---- Campos calculados automáticamente: no se editan a mano ----
-const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion']);
+const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion','pctIIBBProyectados']);
 // Campos "fuente" que, al cambiar, disparan el recálculo
-const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','certificadosAAD']);
+const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','certificadosAAD','cantTotalIIBBProyectados']);
+// Campos "acumulador": tienen un mini sumador al lado para ir agregando valores sin calcular a mano
+const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados']);
 
 const FILTER_KEYS = ['pospre','expediente','anio','nroPedidoCompras','adjudicatario','sucursal','rubro','estado'];
 
@@ -379,11 +381,28 @@ function recalcDerivedFields() {
     pctEl.classList.toggle('valor-sospechoso', fueraDeRango);
     pctEl.title = fueraDeRango ? 'Este % parece incorrecto. Revisá Cantidad/IIBB y $ Adjudicado Unitario de este trámite.' : '';
   }
+
+  // % de IIBB Proyectados respecto IIBB Gestionados = Cant. Total IIBB Proyectados / Cantidades-IIBB del trámite * 100
+  const cantTotalIIBBProy = parseFloat(getFormValue('cantTotalIIBBProyectados')) || 0;
+  const pctIIBB = cantidad > 0 ? (cantTotalIIBBProy / cantidad) * 100 : 0;
+  setFormValue('pctIIBBProyectados', pctIIBB ? pctIIBB.toFixed(2) : '');
 }
 document.getElementById('stagePanels').addEventListener('input', (e) => {
   if (e.target.name && RECALC_TRIGGER_FIELDS.has(e.target.name)) {
     recalcDerivedFields();
   }
+});
+document.getElementById('stagePanels').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('btn-mini-add')) return;
+  const label = e.target.closest('label');
+  const mainInput = label.querySelector('input[name]');
+  const addInput = label.querySelector('.sum-add-input');
+  const aSumar = parseFloat(addInput.value);
+  if (!aSumar) { addInput.focus(); return; }
+  const actual = parseFloat(mainInput.value) || 0;
+  mainInput.value = (actual + aSumar).toString();
+  addInput.value = '';
+  if (RECALC_TRIGGER_FIELDS.has(mainInput.name)) recalcDerivedFields();
 });
 
 function buildFieldInput(f, record) {
@@ -416,7 +435,14 @@ function buildFieldInput(f, record) {
   } else {
     inputHtml = `<input type="text" name="${f.key}" value="${escapeHtml(value)}" ${readonlyAttr} />`;
   }
-  label.innerHTML = `${f.label}${isDerived ? ' <span class="calc-badge">calculado</span>' : ''}${inputHtml}`;
+  const isSumHelper = SUM_HELPER_FIELDS.has(f.key);
+  const sumHelperHtml = isSumHelper
+    ? `<div class="sum-helper">
+        <input type="number" step="any" class="sum-add-input" placeholder="Sumar..." />
+        <button type="button" class="btn-mini-add" title="Sumar al total">+ Sumar</button>
+      </div>`
+    : '';
+  label.innerHTML = `${f.label}${isDerived ? ' <span class="calc-badge">calculado</span>' : ''}${isSumHelper ? ' <span class="calc-badge sum-badge">acumulable</span>' : ''}${inputHtml}${sumHelperHtml}`;
   return label;
 }
 

@@ -424,6 +424,16 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   display:inline-block; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
   color:var(--brand); background:var(--brand-soft); padding:1px 6px; border-radius:99px; margin-left:4px;
 }
+.calc-badge.sum-badge{ color:var(--stage-4); background:#E6F5F3; }
+.sum-helper{ display:flex; gap:6px; margin-top:6px; }
+.sum-helper .sum-add-input{
+  flex:1; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:12.5px;
+}
+.btn-mini-add{
+  flex-shrink:0; background:var(--brand-soft); color:var(--brand-dark); border:1px solid var(--border);
+  border-radius:6px; padding:6px 10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;
+}
+.btn-mini-add:hover{ background:var(--stage-4); color:#fff; border-color:var(--stage-4); }
 .field-grid textarea{ resize:vertical; min-height:60px; }
 .form-actions{ display:flex; align-items:center; gap:16px; justify-content:flex-end; }
 .form-msg{ font-size:13px; margin:0; }
