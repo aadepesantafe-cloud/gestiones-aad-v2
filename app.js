@@ -64,11 +64,16 @@ async function apiCall(action, payload) {
     body.usuario = state.session.usuario;
     body.clave = state.session.clave;
   }
-  const res = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-    body: JSON.stringify(body)
-  });
+  let res;
+  try {
+    res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify(body)
+    });
+  } catch (networkErr) {
+    throw new Error('No se pudo conectar con el servidor. Puede ser un corte de conexión momentáneo o que Google esté demorado — esperá unos segundos y volvé a intentar.');
+  }
   if (!res.ok) throw new Error('Error de red (' + res.status + ')');
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Error desconocido');
