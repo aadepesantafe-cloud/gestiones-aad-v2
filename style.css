@@ -322,7 +322,14 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .ms-empty{ padding:8px; font-size:12px; color:var(--text-soft); }
 
 /* ============ TABLE ============ */
-.table-wrap{ overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.table-wrap{ position:relative; overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
+.table-wrap::after{
+  content:'';
+  position:absolute; top:0; right:0; bottom:0; width:26px;
+  background:linear-gradient(to right, rgba(15,25,35,0), rgba(15,25,35,0.12));
+  pointer-events:none; opacity:1; transition:opacity .2s; border-radius:0 var(--radius) var(--radius) 0;
+}
+.table-wrap.scrolled-end::after{ opacity:0; }
 .data-table{ width:100%; border-collapse:collapse; font-size:13px; white-space:nowrap; }
 .data-table th{
   text-align:left; padding:10px 14px; background:#F8FAFB; color:var(--text-soft);
@@ -341,6 +348,15 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 }
 .icon-btn:hover{ background:var(--brand-soft); border-color:var(--brand); }
 .icon-btn.danger:hover{ background:#FEE2E2; border-color:var(--danger); }
+
+/* Columna "Acciones" fija a la derecha: siempre visible sin importar el scroll horizontal */
+.col-sticky{
+  position:sticky; right:0;
+  background:var(--surface);
+  box-shadow:-6px 0 6px -6px rgba(15,25,35,0.18);
+}
+.data-table thead .col-sticky{ background:#F8FAFB; }
+.data-table tbody tr:hover .col-sticky{ background:var(--brand-soft); }
 .state-pill{
   display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:600;
   font-family:var(--font-ui);

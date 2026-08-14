@@ -636,7 +636,7 @@ function renderRegistros() {
   document.getElementById('resultsCount').textContent = rows.length + ' trámite(s) encontrados de ' + state.registros.length + ' totales.';
   const table = document.getElementById('recordsTable');
   const isAdmin = state.session && state.session.rol === 'admin';
-  const thead = '<thead><tr>' + REGISTROS_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th>Acciones</th></tr></thead>';
+  const thead = '<thead><tr>' + REGISTROS_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th class="col-sticky">Acciones</th></tr></thead>';
   const tbody = '<tbody>' + rows.map(r => {
     const tds = REGISTROS_COLS.map(c => {
       if (c.key === 'estado') {
@@ -648,7 +648,7 @@ function renderRegistros() {
       }
       return `<td>${escapeHtml(r[c.key] != null ? r[c.key] : '')}</td>`;
     }).join('');
-    const acciones = `<td class="row-actions">
+    const acciones = `<td class="row-actions col-sticky">
         <button class="icon-btn" data-action="copiar" title="Copiar datos">📋</button>
         <button class="icon-btn" data-action="clonar" title="Clonar trámite">🧬</button>
         ${isAdmin ? '<button class="icon-btn danger" data-action="eliminar" title="Eliminar trámite">🗑️</button>' : ''}
@@ -656,6 +656,7 @@ function renderRegistros() {
     return `<tr data-id="${r._id}">${tds}${acciones}</tr>`;
   }).join('') + '</tbody>';
   table.innerHTML = thead + tbody;
+  setupScrollShadow(table.closest('.table-wrap'));
 
   table.querySelectorAll('tbody tr').forEach(tr => {
     tr.addEventListener('click', (e) => {
@@ -676,6 +677,21 @@ function renderRegistros() {
       if (btn.dataset.action === 'eliminar') eliminarTramite(rec);
     });
   });
+}
+
+// ---- Oculta la sombra de "hay más contenido" cuando el scroll horizontal llega al final ----
+function setupScrollShadow(wrap) {
+  if (!wrap) return;
+  function update() {
+    const alFinal = wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 2;
+    wrap.classList.toggle('scrolled-end', alFinal || wrap.scrollWidth <= wrap.clientWidth);
+  }
+  update();
+  if (!wrap.dataset.scrollWired) {
+    wrap.dataset.scrollWired = '1';
+    wrap.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+  }
 }
 
 // ---- Copiar: pasa un resumen del trámite al portapapeles ----
