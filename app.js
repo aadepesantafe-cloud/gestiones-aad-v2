@@ -635,7 +635,8 @@ function renderRegistros() {
   const rows = filteredRecords();
   document.getElementById('resultsCount').textContent = rows.length + ' trámite(s) encontrados de ' + state.registros.length + ' totales.';
   const table = document.getElementById('recordsTable');
-  const thead = '<thead><tr>' + REGISTROS_COLS.map(c => `<th>${c.label}</th>`).join('') + '</tr></thead>';
+  const isAdmin = state.session && state.session.rol === 'admin';
+  const thead = '<thead><tr>' + REGISTROS_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th>Acciones</th></tr></thead>';
   const tbody = '<tbody>' + rows.map(r => {
     const tds = REGISTROS_COLS.map(c => {
       if (c.key === 'estado') {
@@ -647,15 +648,91 @@ function renderRegistros() {
       }
       return `<td>${escapeHtml(r[c.key] != null ? r[c.key] : '')}</td>`;
     }).join('');
-    return `<tr data-id="${r._id}">${tds}</tr>`;
+    const acciones = `<td class="row-actions">
+        <button class="icon-btn" data-action="copiar" title="Copiar datos">📋</button>
+        <button class="icon-btn" data-action="clonar" title="Clonar trámite">🧬</button>
+        ${isAdmin ? '<button class="icon-btn danger" data-action="eliminar" title="Eliminar trámite">🗑️</button>' : ''}
+      </td>`;
+    return `<tr data-id="${r._id}">${tds}${acciones}</tr>`;
   }).join('') + '</tbody>';
   table.innerHTML = thead + tbody;
+
   table.querySelectorAll('tbody tr').forEach(tr => {
-    tr.addEventListener('click', () => {
+    tr.addEventListener('click', (e) => {
+      if (e.target.closest('.row-actions')) return; // los botones de acción no abren el formulario
       const rec = state.registros.find(r => r._id === tr.dataset.id);
       if (rec) openRecordForEdit(rec);
     });
   });
+
+  table.querySelectorAll('.row-actions [data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tr = btn.closest('tr');
+      const rec = state.registros.find(r => r._id === tr.dataset.id);
+      if (!rec) return;
+      if (btn.dataset.action === 'copiar') copiarTramite(rec, btn);
+      if (btn.dataset.action === 'clonar') clonarTramite(rec);
+      if (btn.dataset.action === 'eliminar') eliminarTramite(rec);
+    });
+  });
+}
+
+// ---- Copiar: pasa un resumen del trámite al portapapeles ----
+function copiarTramite(r, btn) {
+  const resumen = [
+    'Pospre: ' + (r.pospre || ''),
+    'Expediente: ' + (r.expediente || ''),
+    'Año: ' + (r.anio || ''),
+    'Sucursal: ' + (r.sucursal || ''),
+    'Rubro: ' + (r.rubro || ''),
+    'N° Pedido de Compras: ' + (r.nroPedidoCompras || ''),
+    'Contratista/Proveedor: ' + (r.adjudicatario || ''),
+    'Estado: ' + (r.estado || ''),
+    'Presupuesto Oficial: ' + formatMoney(r.presupuestoOficialRubro),
+    'Total Adjudicado: ' + formatMoney(r.totalAdjudicado),
+    'Total Certificado: ' + formatMoney(r.certificadosAAD),
+  ].join('\n');
+
+  navigator.clipboard.writeText(resumen).then(() => {
+    const original = btn.textContent;
+    btn.textContent = '✅';
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  }).catch(() => {
+    alert('No se pudo copiar. Tu navegador puede estar bloqueando el acceso al portapapeles.');
+  });
+}
+
+// ---- Clonar: crea un trámite nuevo con los mismos datos ----
+async function clonarTramite(r) {
+  const confirmado = confirm('¿Clonar este trámite? Se va a crear un trámite nuevo con los mismos datos (podés editarlo después).');
+  if (!confirmado) return;
+  const datos = {};
+  state.campos.forEach(f => { datos[f.key] = r[f.key]; });
+  try {
+    await apiCall('crear', { datos });
+    const data = await apiCall('listar');
+    state.registros = data.registros;
+    populateFilterOptions();
+    renderRegistros();
+  } catch (err) {
+    alert('Error al clonar: ' + err.message);
+  }
+}
+
+// ---- Eliminar: borra el trámite (solo admin, lo valida también el backend) ----
+async function eliminarTramite(r) {
+  const confirmado = confirm('¿Eliminar definitivamente el trámite "' + (r.expediente || r.pospre || '') + '"? Esta acción no se puede deshacer.');
+  if (!confirmado) return;
+  try {
+    await apiCall('eliminar', { id: r._id });
+    const data = await apiCall('listar');
+    state.registros = data.registros;
+    populateFilterOptions();
+    renderRegistros();
+  } catch (err) {
+    alert('Error al eliminar: ' + err.message);
+  }
 }
 
 document.getElementById('exportBtn').addEventListener('click', () => {
