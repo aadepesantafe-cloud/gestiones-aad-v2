@@ -48,6 +48,7 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   display:flex; flex-direction:column; justify-content:center;
   padding:0 48px;
   position:relative;
+  overflow:hidden;
 }
 .login-brand{
   display:flex; align-items:center; gap:10px; font-weight:600; font-size:15px;
@@ -79,6 +80,29 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .toggle-pass:hover{ color:#fff; background:rgba(255,255,255,0.08); }
 
 .form-error{ color:#FCA5A5; font-size:13px; margin-top:14px; }
+
+/* ---- Indicador de estado de login: espacio siempre reservado, no empuja el layout ---- */
+.login-status{
+  display:flex; align-items:center; gap:8px;
+  margin-top:16px; height:20px;
+  font-size:13px; font-weight:600;
+  opacity:0; transform:translateY(-2px);
+  transition:opacity .15s ease, transform .15s ease;
+}
+.login-status.show{ opacity:1; transform:translateY(0); }
+.login-status-icon{
+  width:18px; height:18px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#fff;
+}
+.login-status[data-state="ok"]{ color:#4ADE80; }
+.login-status[data-state="ok"] .login-status-icon{ background:#16A34A; }
+.login-status[data-state="err"]{ color:#FCA5A5; }
+.login-status[data-state="err"] .login-status-icon{ background:#DC2626; }
+
+/* ---- Realce de color en los campos según el resultado ---- */
+#loginForm input.input-ok{ border-color:#16A34A; box-shadow:0 0 0 1px #16A34A; }
+#loginForm input.input-err{ border-color:#DC2626; box-shadow:0 0 0 1px #DC2626; }
 
 /* Panel derecho: decorativo, se oculta en pantallas angostas */
 .login-right{

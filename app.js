@@ -82,20 +82,33 @@ function clearSession() {
   state.session = null;
 }
 
+function setLoginStatus(state_, text) {
+  const box = document.getElementById('loginStatus');
+  const usuarioEl = document.getElementById('loginUsuario');
+  const claveEl = document.getElementById('loginClave');
+  box.dataset.state = state_;
+  box.querySelector('.login-status-icon').textContent = state_ === 'ok' ? '✓' : (state_ === 'err' ? '✕' : '');
+  box.querySelector('.login-status-text').textContent = text || '';
+  box.classList.toggle('show', state_ !== 'idle');
+  usuarioEl.classList.remove('input-ok', 'input-err');
+  claveEl.classList.remove('input-ok', 'input-err');
+  if (state_ === 'ok') { usuarioEl.classList.add('input-ok'); claveEl.classList.add('input-ok'); }
+  if (state_ === 'err') { usuarioEl.classList.add('input-err'); claveEl.classList.add('input-err'); }
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const usuario = document.getElementById('loginUsuario').value.trim();
   const clave = document.getElementById('loginClave').value;
-  const errEl = document.getElementById('loginError');
-  errEl.hidden = true;
+  setLoginStatus('idle', '');
   try {
     const data = await apiCallLogin(usuario, clave);
     state.session = { usuario: data.user.usuario, nombre: data.user.nombre, rol: data.user.rol, clave };
     saveSession();
-    await boot();
+    setLoginStatus('ok', 'Ingreso correcto');
+    setTimeout(() => boot(), 350); // deja ver el indicador verde un instante antes de entrar
   } catch (err) {
-    errEl.textContent = err.message;
-    errEl.hidden = false;
+    setLoginStatus('err', err.message);
   }
 });
 
