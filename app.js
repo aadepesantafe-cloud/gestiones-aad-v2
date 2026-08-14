@@ -41,7 +41,7 @@ const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fec
 // Campos "fuente" que, al cambiar, disparan el recálculo
 const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','certificadosAAD','cantTotalIIBBProyectados']);
 // Campos "acumulador": tienen un mini sumador al lado para ir agregando valores sin calcular a mano
-const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados']);
+const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados','certificadosAAD','sumatoriaMultas']);
 
 const FILTER_KEYS = ['pospre','expediente','anio','nroPedidoCompras','adjudicatario','sucursal','rubro','estado'];
 
