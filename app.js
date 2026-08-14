@@ -706,6 +706,10 @@ const pointLabelPlugin = {
 function semColor(pct) {
   return pct >= 75 ? '#16A34A' : (pct >= 40 ? '#D97706' : '#DC2626');
 }
+function truncateLabel(text, maxLen) {
+  if (!text) return text;
+  return text.length > maxLen ? text.slice(0, maxLen - 1).trim() + '…' : text;
+}
 
 function renderDashboard() {
   const groupKey = document.getElementById('dashGroupBy').value;
@@ -735,8 +739,8 @@ function renderDashboard() {
     kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'adjudicado / presupuesto oficial'),
     kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
     kpiCard('Multas acumuladas', formatMillions(totalMultas), 'IVA incluido'),
-    kpiCard('Avance de certificación', avanceCertificacion.toFixed(1) + '%', 'certificado / adjudicado'),
   ].join('');
+
 
   // ---- Gráfico 1: Presupuesto Oficial vs Adjudicado vs Certificado, por Sucursal ----
   // (siempre agrupado por Sucursal, respeta los filtros del dashboard incluido Pospre)
@@ -822,10 +826,11 @@ function renderDashboard() {
 
   const ctx4 = document.getElementById('chartCertificacion').getContext('2d');
   if (chartCertificacion) chartCertificacion.destroy();
+  const comboNombresCompletos = comboEntries.map(e => e[0]);
   chartCertificacion = new Chart(ctx4, {
     type: 'line',
     data: {
-      labels: comboEntries.map(e => e[0]),
+      labels: comboEntries.map(e => truncateLabel(e[0], 22)),
       datasets: [{
         label: '% Certificación',
         data: comboEntries.map(e => e[1]),
@@ -843,7 +848,10 @@ function renderDashboard() {
         x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
         y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
       },
-      plugins:{ legend:{ display:false } }
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ title: (items) => comboNombresCompletos[items[0].dataIndex] || '' } }
+      }
     }
   });
 
@@ -971,28 +979,38 @@ function renderContratistaResumen(rows) {
   const shown = contratistaMode === 'top10' ? entries.slice(0, 10) : entries;
 
   // ---- Combo: Certificado vs Pendiente (Adjudicado) por Contratista, con % de Avance (semáforo) ----
+  // El gráfico SIEMPRE se limita a un máximo de barras legibles, sin importar el botón Top10/Todos
+  // (que solo controla las tarjetas de abajo) — graficar 100+ contratistas rompe cualquier visual.
+  const MAX_BARRAS_CONTRATISTA = 12;
+  const chartEntries = entries.slice(0, MAX_BARRAS_CONTRATISTA);
+  const nombresCompletos = chartEntries.map(c => c.nombre);
+  const nombresCortos = chartEntries.map(c => truncateLabel(c.nombre, 16));
+
   const ctxCC = document.getElementById('chartCertContratista').getContext('2d');
   if (chartCertContratista) chartCertContratista.destroy();
   chartCertContratista = new Chart(ctxCC, {
     type: 'bar',
     data: {
-      labels: shown.map(c => c.nombre),
+      labels: nombresCortos,
       datasets: [
-        { type:'bar', label:'Adjudicado', data: shown.map(c => c.adjudicado / 1000000), backgroundColor:'#CBD5E1', order:2 },
-        { type:'bar', label:'Certificado', data: shown.map(c => c.certificado / 1000000), backgroundColor: shown.map(c => semColor(c.avance)), order:2 },
-        { type:'line', label:'% Avance', data: shown.map(c => c.avance), yAxisID:'y1', borderColor:'#64748B', tension:0.3,
-          pointRadius:5, pointBackgroundColor: shown.map(c => semColor(c.avance)), pointBorderColor: shown.map(c => semColor(c.avance)), order:1 }
+        { type:'bar', label:'Adjudicado', data: chartEntries.map(c => c.adjudicado / 1000000), backgroundColor:'#CBD5E1', order:2 },
+        { type:'bar', label:'Certificado', data: chartEntries.map(c => c.certificado / 1000000), backgroundColor: chartEntries.map(c => semColor(c.avance)), order:2 },
+        { type:'line', label:'% Avance', data: chartEntries.map(c => c.avance), yAxisID:'y1', borderColor:'#64748B', tension:0.3,
+          pointRadius:5, pointBackgroundColor: chartEntries.map(c => semColor(c.avance)), pointBorderColor: chartEntries.map(c => semColor(c.avance)), order:1 }
       ]
     },
     plugins: [pointLabelPlugin],
     options: {
       responsive:true, maintainAspectRatio:false,
       scales:{
-        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
+        x:{ ticks:{ autoSkip:false, maxRotation:45, minRotation:30, font:{ size:10 } } },
         y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } },
         y1:{ beginAtZero:true, max:130, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
       },
-      plugins:{ legend:{ position:'bottom' } }
+      plugins:{
+        legend:{ position:'bottom' },
+        tooltip:{ callbacks:{ title: (items) => nombresCompletos[items[0].dataIndex] || '' } }
+      }
     }
   });
 
