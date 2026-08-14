@@ -274,16 +274,18 @@ function stageColorVar(idx) {
   return 'var(--stage-' + (idx + 1) + ')';
 }
 
+// ---- Un Pospre corresponde a Obra Menor si contiene O.D.P o O.D.S (con o sin puntos) ----
+function isObraMenorPospre(val) {
+  const v = (val || '').toLowerCase();
+  return v.includes('o.d.s') || v.includes('o.d.p') || v.includes('ods') || v.includes('odp');
+}
+
 function buildForm(record) {
   const lifeline = document.getElementById('lifeline');
   const panelsWrap = document.getElementById('stagePanels');
   lifeline.innerHTML = '';
   panelsWrap.innerHTML = '';
 
-  const isObraMenorPospre = (val) => {
-    const v = (val || '').toLowerCase();
-    return v.includes('o.d.s') || v.includes('o.d.p') || v.includes('ods') || v.includes('odp');
-  };
   const isOM = isObraMenorPospre(record.pospre);
 
   state.etapas.forEach((etapa, idx) => {
@@ -1770,13 +1772,15 @@ proyBuscarInput.addEventListener('input', () => {
   if (q.length < 2) { resultados.hidden = true; resultados.innerHTML = ''; return; }
 
   const matches = state.registros.filter(r =>
-    String(r.pospre || '').toLowerCase().includes(q) ||
-    String(r.expediente || '').toLowerCase().includes(q) ||
-    String(r.nroPedidoCompras || '').toLowerCase().includes(q)
+    isObraMenorPospre(r.pospre) && (
+      String(r.pospre || '').toLowerCase().includes(q) ||
+      String(r.expediente || '').toLowerCase().includes(q) ||
+      String(r.nroPedidoCompras || '').toLowerCase().includes(q)
+    )
   ).slice(0, 20);
 
   if (!matches.length) {
-    resultados.innerHTML = '<div class="cert-search-item">Sin resultados</div>';
+    resultados.innerHTML = '<div class="cert-search-item">Sin resultados (Proyectos solo aplica a trámites con Pospre O.D.P. u O.D.S.)</div>';
   } else {
     resultados.innerHTML = matches.map(r => `<div class="cert-search-item" data-id="${r._id}">
         ${escapeHtml(r.pospre || '(sin pospre)')} — Exp. ${escapeHtml(r.expediente || '—')} — PC ${escapeHtml(r.nroPedidoCompras || '—')}
