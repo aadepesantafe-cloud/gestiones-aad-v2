@@ -21,6 +21,7 @@
 }
 
 *{ box-sizing:border-box; }
+[hidden]{ display:none !important; } /* asegura que cualquier elemento oculto por JS (hidden=true) se oculte SIEMPRE, sin que otras reglas de display lo tapen */
 html,body{ height:100%; overflow:hidden; } /* la página nunca scrollea completa: solo scrollean los contenedores internos marcados para eso */
 body{
   margin:0;
