@@ -2,6 +2,15 @@
 // Gestiones AAD — lógica de la aplicación
 // ============================================================
 
+// ---- Altura real de pantalla (arregla el bug de 100vh en navegadores mobile,
+//      donde la barra de direcciones aparece/desaparece y genera scroll fantasma) ----
+function setRealViewportHeight() {
+  document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+}
+setRealViewportHeight();
+window.addEventListener('resize', setRealViewportHeight);
+window.addEventListener('orientationchange', setRealViewportHeight);
+
 // ---- Tipos de campo para generar el formulario automáticamente ----
 const DATE_FIELDS = new Set([
   'fechaInicioExpte','fechaPedidoCompras','fechaActoAdmin',
@@ -615,7 +624,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartCertificacion, chartCertificacionPC;
+let chartMontos, chartAdjCertSucursal, chartCertificacion, chartCertificacionPC, chartCertContratista;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
@@ -625,6 +634,8 @@ const pointLabelPlugin = {
   afterDatasetsDraw(chart) {
     const { ctx } = chart;
     chart.data.datasets.forEach((dataset, i) => {
+      if (dataset.type && dataset.type !== 'line') return; // solo dibuja sobre datasets de línea
+      if (dataset.pointRadius === 0) return; // no dibujar sobre la línea de promedio (sin puntos)
       const meta = chart.getDatasetMeta(i);
       if (meta.hidden) return;
       meta.data.forEach((point, index) => {
@@ -640,6 +651,10 @@ const pointLabelPlugin = {
     });
   }
 };
+
+function semColor(pct) {
+  return pct >= 75 ? '#16A34A' : (pct >= 40 ? '#D97706' : '#DC2626');
+}
 
 function renderDashboard() {
   const groupKey = document.getElementById('dashGroupBy').value;
@@ -702,6 +717,37 @@ function renderDashboard() {
         legend:{ position:'bottom' },
         tooltip:{ callbacks:{ label: (ctx) => ctx.dataset.label + ': $ ' + ctx.parsed.y.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' M' } }
       }
+    }
+  });
+
+  // ---- Combo: Adjudicado vs Certificado por Sucursal, con % de Avance (semáforo) ----
+  const pctPorSucursal = sucursalEntries.map(e => e[1].adjudicado > 0 ? (e[1].certificado / e[1].adjudicado) * 100 : 0);
+  const promedioAvanceSucursal = totalAdjudicado > 0 ? (totalCertificado / totalAdjudicado) * 100 : 0;
+
+  const ctxAC = document.getElementById('chartAdjCertSucursal').getContext('2d');
+  if (chartAdjCertSucursal) chartAdjCertSucursal.destroy();
+  chartAdjCertSucursal = new Chart(ctxAC, {
+    type: 'bar',
+    data: {
+      labels: sucursalEntries.map(e => e[0]),
+      datasets: [
+        { type:'bar', label:'Adjudicado', data: sucursalEntries.map(e => e[1].adjudicado / 1000000), backgroundColor:'#93C5FD', order:2 },
+        { type:'bar', label:'Certificado', data: sucursalEntries.map(e => e[1].certificado / 1000000), backgroundColor:'#6EE7B7', order:2 },
+        { type:'line', label:'% Avance por Sucursal', data: pctPorSucursal, yAxisID:'y1', borderColor:'#64748B', tension:0.3,
+          pointRadius:5, pointBackgroundColor: pctPorSucursal.map(semColor), pointBorderColor: pctPorSucursal.map(semColor), order:1 },
+        { type:'line', label:'Promedio General (' + promedioAvanceSucursal.toFixed(0) + '%)', data: sucursalEntries.map(() => promedioAvanceSucursal),
+          yAxisID:'y1', borderColor:'#D97706', borderDash:[6,4], pointRadius:0, order:0 }
+      ]
+    },
+    plugins: [pointLabelPlugin],
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30 } },
+        y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } },
+        y1:{ beginAtZero:true, max:130, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
+      },
+      plugins:{ legend:{ position:'bottom' } }
     }
   });
 
@@ -868,10 +914,37 @@ function renderContratistaResumen(rows) {
   ].join('');
 
   const shown = contratistaMode === 'top10' ? entries.slice(0, 10) : entries;
+
+  // ---- Combo: Certificado vs Pendiente (Adjudicado) por Contratista, con % de Avance (semáforo) ----
+  const ctxCC = document.getElementById('chartCertContratista').getContext('2d');
+  if (chartCertContratista) chartCertContratista.destroy();
+  chartCertContratista = new Chart(ctxCC, {
+    type: 'bar',
+    data: {
+      labels: shown.map(c => c.nombre),
+      datasets: [
+        { type:'bar', label:'Adjudicado', data: shown.map(c => c.adjudicado / 1000000), backgroundColor:'#CBD5E1', order:2 },
+        { type:'bar', label:'Certificado', data: shown.map(c => c.certificado / 1000000), backgroundColor: shown.map(c => semColor(c.avance)), order:2 },
+        { type:'line', label:'% Avance', data: shown.map(c => c.avance), yAxisID:'y1', borderColor:'#64748B', tension:0.3,
+          pointRadius:5, pointBackgroundColor: shown.map(c => semColor(c.avance)), pointBorderColor: shown.map(c => semColor(c.avance)), order:1 }
+      ]
+    },
+    plugins: [pointLabelPlugin],
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
+        y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } },
+        y1:{ beginAtZero:true, max:130, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
+      },
+      plugins:{ legend:{ position:'bottom' } }
+    }
+  });
+
   const grid = document.getElementById('contratistaGrid');
   grid.innerHTML = shown.length ? shown.map((c, idx) => {
     const semaforo = c.avance >= 75 ? '🟢' : (c.avance >= 40 ? '🟡' : '🔴');
-    const barColor = c.avance >= 75 ? '#16A34A' : (c.avance >= 40 ? '#D97706' : '#DC2626');
+    const barColor = semColor(c.avance);
     return `<div class="contratista-card">
       <span class="semaforo">${semaforo}</span>
       <div class="rank">#${idx + 1}</div>
