@@ -959,12 +959,12 @@ function renderDashboard() {
   rows.forEach(r => {
     if (!r.adjudicatario) return;
     const key = (r.sucursal || '(sin sucursal)').trim() + ' · ' + r.adjudicatario.trim();
-    if (!byCombo[key]) byCombo[key] = { presOficial:0, certificado:0 };
-    byCombo[key].presOficial += num(r.presupuestoOficialRubro);
+    if (!byCombo[key]) byCombo[key] = { adjudicado:0, certificado:0 };
+    byCombo[key].adjudicado += num(r.totalAdjudicado);
     byCombo[key].certificado += num(r.certificadosAAD);
   });
   const comboEntries = Object.entries(byCombo)
-    .map(([k, v]) => [k, v.presOficial > 0 ? (v.certificado / v.presOficial) * 100 : 0])
+    .map(([k, v]) => [k, v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0])
     .sort((a,b) => b[1] - a[1])
     .slice(0, 15);
 
@@ -1004,12 +1004,12 @@ function renderDashboard() {
   rows.forEach(r => {
     if (!r.nroPedidoCompras) return;
     const key = String(r.nroPedidoCompras).trim();
-    if (!byPC[key]) byPC[key] = { presOficial:0, certificado:0 };
-    byPC[key].presOficial += num(r.presupuestoOficialRubro);
+    if (!byPC[key]) byPC[key] = { adjudicado:0, certificado:0 };
+    byPC[key].adjudicado += num(r.totalAdjudicado);
     byPC[key].certificado += num(r.certificadosAAD);
   });
   const pcEntries = Object.entries(byPC)
-    .map(([k, v]) => [k, v.presOficial > 0 ? (v.certificado / v.presOficial) * 100 : 0])
+    .map(([k, v]) => [k, v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0])
     .sort((a,b) => b[1] - a[1])
     .slice(0, 15);
 
