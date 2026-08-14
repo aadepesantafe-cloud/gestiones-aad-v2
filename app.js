@@ -643,15 +643,110 @@ document.getElementById('riesgoPlazoBtn').addEventListener('click', () => {
 
 // ---- Criterio de "Riesgo por Plazo": vencido o vence en <=30 días, y no está Finalizado ----
 const DIAS_RIESGO = 30;
+function fechaLimiteTramite(r) {
+  return r.fechaFinPlazoAmpliada || r.fechaFinContrato || '';
+}
 function esRiesgoPorPlazo(r) {
   if (r.estado === 'Finalizado') return false;
-  const fechaLimite = r.fechaFinPlazoAmpliada || r.fechaFinContrato;
+  const fechaLimite = fechaLimiteTramite(r);
   if (!fechaLimite) return false;
   const dLimite = new Date(fechaLimite + 'T00:00:00');
   if (isNaN(dLimite.getTime())) return false;
   const hoy = new Date(); hoy.setHours(0,0,0,0);
   const diffDias = (dLimite - hoy) / (1000 * 60 * 60 * 24);
   return diffDias <= DIAS_RIESGO;
+}
+
+// ============================================================
+// CALENDARIO DE VENCIMIENTOS
+// ============================================================
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let calMonthDate = new Date(); calMonthDate.setDate(1);
+let calSelectedDay = null;
+
+document.getElementById('calPrevBtn').addEventListener('click', () => {
+  calMonthDate.setMonth(calMonthDate.getMonth() - 1);
+  calSelectedDay = null;
+  renderCalendar();
+});
+document.getElementById('calNextBtn').addEventListener('click', () => {
+  calMonthDate.setMonth(calMonthDate.getMonth() + 1);
+  calSelectedDay = null;
+  renderCalendar();
+});
+document.getElementById('calTodayBtn').addEventListener('click', () => {
+  calMonthDate = new Date(); calMonthDate.setDate(1);
+  calSelectedDay = null;
+  renderCalendar();
+});
+
+function renderCalendar() {
+  const rows = filteredForDashboardBase(); // respeta filtros del dashboard, no el toggle de riesgo (queremos ver todo el mes)
+  const porDia = {};
+  rows.forEach(r => {
+    if (r.estado === 'Finalizado') return;
+    const fecha = fechaLimiteTramite(r);
+    if (!fecha) return;
+    if (!porDia[fecha]) porDia[fecha] = [];
+    porDia[fecha].push(r);
+  });
+
+  document.getElementById('calMonthLabel').textContent = MESES_ES[calMonthDate.getMonth()] + ' ' + calMonthDate.getFullYear();
+
+  const year = calMonthDate.getFullYear();
+  const month = calMonthDate.getMonth();
+  const primerDiaSemana = (new Date(year, month, 1).getDay() + 6) % 7; // 0=lunes
+  const diasEnMes = new Date(year, month + 1, 0).getDate();
+  const hoyStr = new Date().toISOString().slice(0, 10);
+
+  const grid = document.getElementById('calendarGrid');
+  let html = '';
+  for (let i = 0; i < primerDiaSemana; i++) html += '<div class="cal-day cal-empty"></div>';
+
+  for (let d = 1; d <= diasEnMes; d++) {
+    const fechaStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const eventos = porDia[fechaStr] || [];
+    const esHoy = fechaStr === hoyStr;
+    let badges = '';
+    if (eventos.length) {
+      const vencidos = eventos.filter(r => fechaStr < hoyStr).length;
+      const proximos = eventos.filter(r => fechaStr >= hoyStr && (new Date(fechaStr) - new Date(hoyStr)) / 86400000 <= DIAS_RIESGO).length;
+      const lejanos = eventos.length - vencidos - proximos;
+      if (vencidos) badges += `<span class="cal-badge vencido">${vencidos}</span>`;
+      if (proximos) badges += `<span class="cal-badge proximo">${proximos}</span>`;
+      if (lejanos) badges += `<span class="cal-badge lejano">${lejanos}</span>`;
+    }
+    html += `<div class="cal-day ${esHoy ? 'cal-today' : ''} ${eventos.length ? 'cal-has-events' : ''}" data-fecha="${fechaStr}">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-day-badges">${badges}</div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-has-events').forEach(el => {
+    el.addEventListener('click', () => {
+      calSelectedDay = el.dataset.fecha;
+      mostrarDetalleDia(porDia[calSelectedDay], calSelectedDay);
+    });
+  });
+
+  const detailBox = document.getElementById('calendarDayDetail');
+  if (calSelectedDay && porDia[calSelectedDay]) {
+    mostrarDetalleDia(porDia[calSelectedDay], calSelectedDay);
+  } else {
+    detailBox.hidden = true;
+  }
+}
+
+function mostrarDetalleDia(eventos, fechaStr) {
+  const detailBox = document.getElementById('calendarDayDetail');
+  const fechaLegible = new Date(fechaStr + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  detailBox.innerHTML = `<h4>Vencen el ${fechaLegible} (${eventos.length})</h4>` +
+    eventos.map(r => `<div class="cal-detail-item">
+        <span>${escapeHtml(r.nroPedidoCompras || '(sin PC)')} — ${escapeHtml(r.adjudicatario || '(sin contratista)')} — ${escapeHtml(r.sucursal || '')}</span>
+        <b>${escapeHtml(r.expediente || '')}</b>
+      </div>`).join('');
+  detailBox.hidden = false;
 }
 
 function filteredForDashboardBase() {
@@ -917,6 +1012,9 @@ function renderDashboard() {
   // ---- Badge de "Riesgo por Plazo": cuenta sobre el resto de los filtros, sin aplicar el toggle de riesgo ----
   const riesgoCount = filteredForDashboardBase().filter(esRiesgoPorPlazo).length;
   document.getElementById('riesgoPlazoBadge').textContent = riesgoCount;
+
+  // ---- Calendario de vencimientos ----
+  renderCalendar();
 
   // ---- KPIs generales (montos en millones, 2 decimales) ----
   const totalPresOficial = sumField(rows, 'presupuestoOficialRubro');

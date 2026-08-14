@@ -150,6 +150,23 @@
       <div class="kpi-row" id="kpiRow"></div>
 
       <div class="panel">
+        <div class="view-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Calendario de Vencimientos (Fecha Fin de Plazo)</h3>
+          <div class="control-inline">
+            <button id="calPrevBtn" class="btn btn-ghost">‹</button>
+            <span id="calMonthLabel" class="cal-month-label"></span>
+            <button id="calNextBtn" class="btn btn-ghost">›</button>
+            <button id="calTodayBtn" class="btn btn-ghost">Hoy</button>
+          </div>
+        </div>
+        <div class="calendar-weekdays">
+          <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+        <div id="calendarDayDetail" class="calendar-day-detail" hidden></div>
+      </div>
+
+      <div class="panel">
         <h3>Presupuesto Oficial vs. Adjudicado vs. Certificación — por Sucursal (Pospre filtrada)</h3>
         <canvas id="chartMontos" height="130"></canvas>
       </div>
