@@ -1171,6 +1171,29 @@ document.getElementById('userForm').addEventListener('submit', async (e) => {
 });
 
 // ---- Completar valores iniciales faltantes (una sola vez, base original) ----
+// ---- Corrección de IVA (una sola vez, doble confirmación por ser una operación sensible) ----
+document.getElementById('corregirIvaBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('corregirIvaMsg');
+  msg.hidden = true;
+  const c1 = confirm('Esto va a dividir por 1,21 los campos monetarios de TODOS los trámites (Pres. Oficial Unitario, Adjudicado Unitario, Km de Línea, Proyectados Acumulados, Certificados AAD y Multas), y va a recalcular Presupuesto Oficial, Total Adjudicado y % de Avance con esos valores corregidos.\n\n¿Ya hiciste una copia de seguridad del Google Sheet?');
+  if (!c1) return;
+  const c2 = confirm('Confirmación final: esta operación debe ejecutarse UNA SOLA VEZ. Si la corrés dos veces, va a dividir el IVA otra vez sobre datos que ya están corregidos.\n\n¿Confirmás que querés continuar ahora?');
+  if (!c2) return;
+  try {
+    const r = await apiCall('corregir_iva');
+    msg.textContent = 'Listo: se corrigieron ' + r.corregidos + ' trámites.';
+    msg.className = 'form-msg ok';
+    msg.hidden = false;
+    const data = await apiCall('listar');
+    state.registros = data.registros;
+    populateFilterOptions();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'form-msg err';
+    msg.hidden = false;
+  }
+});
+
 document.getElementById('completarBtn').addEventListener('click', async () => {
   const msg = document.getElementById('completarMsg');
   msg.hidden = true;

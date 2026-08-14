@@ -286,6 +286,21 @@
         <table id="usersTable" class="data-table"></table>
       </div>
 
+      <div class="panel" style="max-width:520px;border-color:#FCA5A5;">
+        <h3 style="color:var(--danger);">⚠ Corrección de IVA (una sola vez)</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">
+          Divide por <strong>1,21</strong> los campos monetarios: $ Pres. Oficial Unitario,
+          $ Adjudicado Unitario, $ Km de Línea del PC, $ Proyectados Acumulados,
+          $ certificados por AAD y Sumatoria de Multas. En el mismo paso recalcula
+          Presupuesto Oficial, Total Adjudicado y % de Avance con esos valores ya corregidos.
+          <br/><strong>Usalo una sola vez.</strong> Ejecutarlo dos veces volvería a dividir datos
+          que ya están corregidos. Asegurate de tener una copia de seguridad del Sheet antes de usarlo
+          (Archivo → Hacer una copia).
+        </p>
+        <button id="corregirIvaBtn" class="btn" style="background:var(--danger);color:#fff;">Dividir valores monetarios por 1,21</button>
+        <p id="corregirIvaMsg" class="form-msg" hidden></p>
+      </div>
+
       <div class="panel" style="max-width:520px">
         <h3>Completar valores iniciales faltantes</h3>
         <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">
