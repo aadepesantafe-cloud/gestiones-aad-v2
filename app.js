@@ -615,7 +615,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartCertificacion;
+let chartMontos, chartCertificacion, chartCertificacionPC;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
@@ -733,6 +733,47 @@ function renderDashboard() {
         tension: 0.3,
         pointRadius: 4,
         pointBackgroundColor: '#0D9488'
+      }]
+    },
+    plugins: [pointLabelPlugin],
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
+        y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
+      },
+      plugins:{ legend:{ display:false } }
+    }
+  });
+
+  // ---- Gráfico 3: % de Certificación por Pedido de Compras (curva, otro color) ----
+  const byPC = {};
+  rows.forEach(r => {
+    if (!r.nroPedidoCompras) return;
+    const key = String(r.nroPedidoCompras).trim();
+    if (!byPC[key]) byPC[key] = { presOficial:0, certificado:0 };
+    byPC[key].presOficial += num(r.presupuestoOficialRubro);
+    byPC[key].certificado += num(r.certificadosAAD);
+  });
+  const pcEntries = Object.entries(byPC)
+    .map(([k, v]) => [k, v.presOficial > 0 ? (v.certificado / v.presOficial) * 100 : 0])
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 15);
+
+  const ctx5 = document.getElementById('chartCertificacionPC').getContext('2d');
+  if (chartCertificacionPC) chartCertificacionPC.destroy();
+  chartCertificacionPC = new Chart(ctx5, {
+    type: 'line',
+    data: {
+      labels: pcEntries.map(e => e[0]),
+      datasets: [{
+        label: '% Certificación',
+        data: pcEntries.map(e => e[1]),
+        borderColor: '#D97706',
+        backgroundColor: '#D97706',
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#D97706'
       }]
     },
     plugins: [pointLabelPlugin],
