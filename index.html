@@ -113,6 +113,14 @@
           <div class="multiselect" data-dashfilter="pospre"></div>
         </div>
         <div class="filter-field">
+          <label>N° Pedido de Compras</label>
+          <div class="multiselect" data-dashfilter="nroPedidoCompras"></div>
+        </div>
+        <div class="filter-field">
+          <label>Contratista/Proveedor</label>
+          <div class="multiselect" data-dashfilter="adjudicatario"></div>
+        </div>
+        <div class="filter-field">
           <label>Estado</label>
           <div class="multiselect" data-dashfilter="estado"></div>
         </div>
@@ -238,6 +246,17 @@
       </div>
       <div class="table-wrap">
         <table id="usersTable" class="data-table"></table>
+      </div>
+
+      <div class="panel" style="max-width:520px">
+        <h3>Campos calculados</h3>
+        <p style="font-size:13px;color:var(--text-soft);margin:0 0 14px;">
+          Presupuesto Oficial, Total Adjudicado, Fechas de fin de contrato y % de Avance de Certificación
+          se calculan solos en el formulario. Este botón vuelve a calcularlos para <strong>todos</strong>
+          los trámites ya cargados (útil si recién agregaste esta función).
+        </p>
+        <button id="recalcBtn" class="btn btn-secondary">Recalcular todos los trámites</button>
+        <p id="recalcMsg" class="form-msg" hidden></p>
       </div>
     </section>
 

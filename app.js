@@ -24,6 +24,11 @@ const SELECT_FIELDS = {
 };
 const LONG_FIELDS = new Set(['detalleRubro','observaciones']);
 
+// ---- Campos calculados automáticamente: no se editan a mano ----
+const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion']);
+// Campos "fuente" que, al cambiar, disparan el recálculo
+const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','certificadosAAD']);
+
 const FILTER_KEYS = ['pospre','expediente','anio','nroPedidoCompras','adjudicatario','sucursal','rubro','estado'];
 
 // ---- Estado en memoria ----
@@ -38,7 +43,7 @@ const state = {
   activeStage: null
 };
 
-const DASH_FILTER_KEYS = ['anio','sucursal','rubro','pospre','estado'];
+const DASH_FILTER_KEYS = ['anio','sucursal','rubro','pospre','nroPedidoCompras','adjudicatario','estado'];
 
 // ============================================================
 // API
@@ -293,12 +298,58 @@ function buildForm(record) {
   state.activeStage = state.etapas[0].id;
   setActiveStage(state.activeStage);
   document.getElementById('formMsg').hidden = true;
+  recalcDerivedFields(); // completa los campos calculados con los valores ya cargados (modo edición)
 }
+
+// ---- Recalcula los campos derivados en vivo, a partir de los campos "fuente" del formulario ----
+function getFormValue(name) {
+  const el = document.querySelector('#stagePanels [name="' + name + '"]');
+  return el ? el.value : '';
+}
+function setFormValue(name, value) {
+  const el = document.querySelector('#stagePanels [name="' + name + '"]');
+  if (el) el.value = value;
+}
+function addDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + (parseInt(days) || 0));
+  return d.toISOString().slice(0, 10);
+}
+function recalcDerivedFields() {
+  const cantidad = parseFloat(getFormValue('cantidadesIIBB')) || 0;
+  const presUnit = parseFloat(getFormValue('presOficialUnitario')) || 0;
+  const adjUnit = parseFloat(getFormValue('adjudicadoUnitario')) || 0;
+
+  const presOficial = cantidad * presUnit;
+  const totalAdj = cantidad * adjUnit;
+  setFormValue('presupuestoOficialRubro', presOficial ? presOficial.toFixed(2) : '');
+  setFormValue('totalAdjudicado', totalAdj ? totalAdj.toFixed(2) : '');
+
+  const fInicioReal = getFormValue('fechaInicioReal');
+  const plazoEntrega = parseInt(getFormValue('plazoEntrega')) || 0;
+  const ampliacion = parseInt(getFormValue('ampliacionPlazo')) || 0;
+  if (fInicioReal) {
+    setFormValue('fechaFinContrato', addDays(fInicioReal, plazoEntrega));
+    setFormValue('fechaFinPlazoAmpliada', addDays(fInicioReal, plazoEntrega + ampliacion));
+  }
+
+  const certificado = parseFloat(getFormValue('certificadosAAD')) || 0;
+  const pct = totalAdj > 0 ? (certificado / totalAdj) * 100 : 0;
+  setFormValue('pctAvanceCertificacion', pct ? pct.toFixed(2) : '');
+}
+document.getElementById('stagePanels').addEventListener('input', (e) => {
+  if (e.target.name && RECALC_TRIGGER_FIELDS.has(e.target.name)) {
+    recalcDerivedFields();
+  }
+});
 
 function buildFieldInput(f, record) {
   const label = document.createElement('label');
   if (LONG_FIELDS.has(f.key)) label.classList.add('span-2');
   const value = record[f.key] != null ? record[f.key] : '';
+  const isDerived = DERIVED_FIELDS.has(f.key);
+  const readonlyAttr = isDerived ? 'readonly tabindex="-1"' : '';
 
   let inputHtml;
   if (SELECT_FIELDS[f.key]) {
@@ -309,13 +360,13 @@ function buildFieldInput(f, record) {
   } else if (LONG_FIELDS.has(f.key)) {
     inputHtml = `<textarea name="${f.key}">${escapeHtml(value)}</textarea>`;
   } else if (DATE_FIELDS.has(f.key)) {
-    inputHtml = `<input type="date" name="${f.key}" value="${escapeHtml(value)}" />`;
+    inputHtml = `<input type="date" name="${f.key}" value="${escapeHtml(value)}" ${readonlyAttr} />`;
   } else if (NUMBER_FIELDS.has(f.key)) {
-    inputHtml = `<input type="number" step="any" name="${f.key}" value="${escapeHtml(value)}" />`;
+    inputHtml = `<input type="number" step="any" name="${f.key}" value="${escapeHtml(value)}" ${readonlyAttr} />`;
   } else {
-    inputHtml = `<input type="text" name="${f.key}" value="${escapeHtml(value)}" />`;
+    inputHtml = `<input type="text" name="${f.key}" value="${escapeHtml(value)}" ${readonlyAttr} />`;
   }
-  label.innerHTML = `${f.label}${inputHtml}`;
+  label.innerHTML = `${f.label}${isDerived ? ' <span class="calc-badge">calculado</span>' : ''}${inputHtml}`;
   return label;
 }
 
@@ -745,6 +796,27 @@ document.getElementById('userForm').addEventListener('submit', async (e) => {
     msg.hidden = false;
     document.getElementById('userForm').reset();
     renderUsuarios();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'form-msg err';
+    msg.hidden = false;
+  }
+});
+
+// ---- Recalcular campos derivados de todos los trámites existentes ----
+document.getElementById('recalcBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('recalcMsg');
+  msg.hidden = true;
+  const confirmado = confirm('Esto va a recalcular Presupuesto Oficial, Total Adjudicado, Fechas de fin y % de Avance para TODOS los trámites cargados, sobrescribiendo esos valores. ¿Continuar?');
+  if (!confirmado) return;
+  try {
+    const r = await apiCall('recalcular_todos');
+    msg.textContent = 'Listo: se recalcularon ' + r.actualizados + ' trámites.';
+    msg.className = 'form-msg ok';
+    msg.hidden = false;
+    const data = await apiCall('listar');
+    state.registros = data.registros;
+    populateFilterOptions();
   } catch (err) {
     msg.textContent = 'Error: ' + err.message;
     msg.className = 'form-msg err';
