@@ -31,6 +31,9 @@ const SELECT_FIELDS = {
   movilidadInspeccion: ['Si','No'],
   estado: ['Adjudicado','Desierto','Relanzado','Finalizado']
 };
+// Campos con opciones dinámicas: se cargan a partir de los valores ya existentes en la base
+// (evita errores de tipeo, obliga a elegir uno de los que ya existen).
+const DYNAMIC_SELECT_FIELDS = new Set(['pospre']);
 const LONG_FIELDS = new Set(['detalleRubro','observaciones']);
 
 // ---- Campos calculados automáticamente: no se editan a mano ----
@@ -385,6 +388,14 @@ function buildFieldInput(f, record) {
       SELECT_FIELDS[f.key].map(o => `<option value="${o}" ${value === o ? 'selected' : ''}>${o}</option>`)
     );
     inputHtml = `<select name="${f.key}">${opts.join('')}</select>`;
+  } else if (DYNAMIC_SELECT_FIELDS.has(f.key)) {
+    const existentes = uniqueValues(f.key);
+    // Si el registro que se está editando tiene un valor que ya no está en la lista (caso raro), lo incluimos igual para no perderlo.
+    if (value && !existentes.includes(value)) existentes.unshift(value);
+    const opts = ['<option value="">— Elegí un ' + escapeHtml(f.label) + ' existente —</option>'].concat(
+      existentes.map(o => `<option value="${escapeHtml(o)}" ${value === o ? 'selected' : ''}>${escapeHtml(o)}</option>`)
+    );
+    inputHtml = `<select name="${f.key}">${opts.join('')}</select>`;
   } else if (LONG_FIELDS.has(f.key)) {
     inputHtml = `<textarea name="${f.key}">${escapeHtml(value)}</textarea>`;
   } else if (DATE_FIELDS.has(f.key)) {
@@ -656,6 +667,8 @@ const REGISTROS_COLS = [
   { key: 'adjudicatario', label: 'Contratista' },
   { key: 'presupuestoOficialRubro', label: 'Pres. Oficial' },
   { key: 'totalAdjudicado', label: 'Total Adjudicado' },
+  { key: 'certificadosAAD', label: 'Certificado' },
+  { key: 'pctAvance', label: '% Avance' },
   { key: 'estado', label: 'Estado' }
 ];
 
@@ -671,8 +684,13 @@ function renderRegistros() {
         const cls = r.estado && ['Adjudicado','Desierto','Relanzado','Finalizado'].includes(r.estado) ? 'state-' + r.estado : 'state-default';
         return `<td>${r.estado ? `<span class="state-pill ${cls}">${escapeHtml(r.estado)}</span>` : ''}</td>`;
       }
-      if (c.key === 'presupuestoOficialRubro' || c.key === 'totalAdjudicado') {
+      if (c.key === 'presupuestoOficialRubro' || c.key === 'totalAdjudicado' || c.key === 'certificadosAAD') {
         return `<td>${formatMoney(r[c.key])}</td>`;
+      }
+      if (c.key === 'pctAvance') {
+        const adj = num(r.totalAdjudicado);
+        const avance = adj > 0 ? (num(r.certificadosAAD) / adj) * 100 : 0;
+        return `<td>${avance.toFixed(1)}%</td>`;
       }
       return `<td>${escapeHtml(r[c.key] != null ? r[c.key] : '')}</td>`;
     }).join('');
@@ -868,7 +886,7 @@ function renderDashboard() {
   const totalAdjudicado = sumField(rows, 'totalAdjudicado');
   const totalCertificado = sumField(rows, 'certificadosAAD');
   const totalMultas = sumField(rows, 'sumatoriaMultas');
-  const pctEjecucion = totalPresOficial > 0 ? (totalAdjudicado / totalPresOficial) * 100 : 0;
+  const pctEjecucion = totalAdjudicado > 0 ? (totalCertificado / totalAdjudicado) * 100 : 0;
   const desvioPresupuestario = totalPresOficial > 0 ? ((totalAdjudicado - totalPresOficial) / totalPresOficial) * 100 : 0;
   // % de Avance por Certificación: misma fórmula que el campo calculado (Certificado / Adjudicado * 100),
   // aplicada sobre los totales del filtro actual — para que coincida con el dato individual, no un promedio aparte.
@@ -880,7 +898,7 @@ function renderDashboard() {
     kpiCard('Presupuesto oficial total', formatMillions(totalPresOficial), 'sin IVA'),
     kpiCard('Total adjudicado', formatMillions(totalAdjudicado), 'sin IVA'),
     kpiCard('Certificado por AAD', formatMillions(totalCertificado), 'IVA incluido'),
-    kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'adjudicado / presupuesto oficial'),
+    kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'certificado / adjudicado'),
     kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
     kpiCard('Multas acumuladas', formatMillions(totalMultas), 'IVA incluido'),
   ].join('');
@@ -1056,10 +1074,11 @@ function renderDashboard() {
   const entries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial).slice(0, 12);
 
   const table = document.getElementById('dashTable');
-  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th></tr></thead>' +
-    '<tbody>' + entries.map(([k, v]) =>
-      `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td></tr>`
-    ).join('') + '</tbody>';
+  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th></tr></thead>' +
+    '<tbody>' + entries.map(([k, v]) => {
+      const avanceGrupo = v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0;
+      return `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td></tr>`;
+    }).join('') + '</tbody>';
 }
 
 let contratistaMode = 'top10';
