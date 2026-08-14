@@ -73,6 +73,9 @@
       <button class="nav-btn" data-view="certificaciones">
         <span class="nav-icon">✓</span> Certificaciones
       </button>
+      <button class="nav-btn" data-view="proyectos">
+        <span class="nav-icon">◫</span> Proyectos
+      </button>
       <button class="nav-btn" data-view="formulario">
         <span class="nav-icon">＋</span> Nuevo trámite
       </button>
@@ -316,6 +319,61 @@
         </div>
         <div class="table-wrap">
           <table id="certTable" class="data-table"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- PROYECTOS ---------- -->
+    <section id="view-proyectos" class="view" hidden>
+      <div class="view-header">
+        <h2>Proyectos</h2>
+      </div>
+
+      <div class="panel" id="proyFormPanel">
+        <h3>Cargar proyecto</h3>
+
+        <div class="field-grid">
+          <label class="span-2" style="position:relative;">Buscar trámite (Pospre, Expediente o N° Pedido de Compras)
+            <input type="text" id="proyBuscarTramite" placeholder="Escribí para buscar..." autocomplete="off" />
+            <div id="proyResultadosBusqueda" class="cert-search-results" hidden></div>
+          </label>
+        </div>
+
+        <div id="proyTramiteSeleccionado" class="cert-tramite-chip" hidden></div>
+
+        <form id="proyForm" hidden>
+          <div class="field-grid">
+            <label>Pospre <input type="text" id="proyPospre" readonly /></label>
+            <label>Sucursal <input type="text" id="proySucursal" readonly /></label>
+            <label>Pedido de Compras <input type="text" id="proyPC" readonly /></label>
+            <label>Contratista <input type="text" id="proyContratista" readonly /></label>
+            <label>N° de Expediente de Proyecto <input type="text" name="nroExpedienteProyecto" /></label>
+            <label>Número de Proyecto <input type="text" name="numeroProyecto" /></label>
+            <label>$ Km de LAMT <input type="number" step="any" name="montoKmLAMT" /></label>
+            <label>Mes/Año Km de LAMT <input type="month" name="mesAnioKmLAMT" /></label>
+            <label class="span-2">Descripción del Proyecto <textarea name="descripcionProyecto"></textarea></label>
+            <label>IIBB del Proyecto <input type="number" step="any" name="iibbProyecto" /></label>
+            <label>$ del Proyecto <input type="number" step="any" name="montoProyecto" /></label>
+            <label class="span-2">Observaciones <textarea name="observaciones"></textarea></label>
+          </div>
+          <div class="form-actions">
+            <p id="proyFormMsg" class="form-msg" hidden></p>
+            <button type="button" id="proyCancelarBtn" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar proyecto</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h3>Proyectos cargados</h3>
+        <div class="filters-bar">
+          <div class="filter-field">
+            <label>Buscar</label>
+            <input type="text" id="proyFiltroTexto" placeholder="Pospre, expediente, contratista..." />
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="proyTable" class="data-table"></table>
         </div>
       </div>
     </section>

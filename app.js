@@ -37,11 +37,11 @@ const DYNAMIC_SELECT_FIELDS = new Set(['pospre']);
 const LONG_FIELDS = new Set(['detalleRubro','observaciones']);
 
 // ---- Campos calculados automáticamente: no se editan a mano ----
-const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion','pctIIBBProyectados','certificadosAAD','sumatoriaMultas','cantidadCertificadosProcesados']);
+const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion','pctIIBBProyectados','certificadosAAD','sumatoriaMultas','cantidadCertificadosProcesados','cantidadProyectos','kmLineaPC','mmAAkmLAMT','cantTotalIIBBProyectados','proyectadosAcumulados']);
 // Campos "fuente" que, al cambiar, disparan el recálculo
-const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','cantTotalIIBBProyectados']);
+const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo']);
 // Campos "acumulador": tienen un mini sumador al lado para ir agregando valores sin calcular a mano
-const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados']);
+const SUM_HELPER_FIELDS = new Set([]);
 
 const FILTER_KEYS = ['pospre','expediente','anio','nroPedidoCompras','adjudicatario','sucursal','rubro','estado'];
 
@@ -192,6 +192,7 @@ function showView(name) {
   if (name === 'registros') renderRegistros();
   if (name === 'vencimientos') renderCalendar();
   if (name === 'certificaciones') abrirVistaCertificaciones();
+  if (name === 'proyectos') abrirVistaProyectos();
   if (name === 'usuarios') renderUsuarios();
 }
 
@@ -332,6 +333,17 @@ function buildForm(record) {
       }
       panel.appendChild(nota);
     }
+    if (etapa.id === 'proyectos') {
+      const nota = document.createElement('div');
+      nota.className = 'cert-nota';
+      if (record._id) {
+        nota.innerHTML = `<p>Estos valores se calculan solos, sumando los proyectos cargados en la pestaña <strong>Proyectos</strong>.</p>
+          <button type="button" class="btn btn-secondary" id="verProyectosBtn">Ver / cargar proyectos de este trámite</button>`;
+      } else {
+        nota.innerHTML = `<p>Estos valores se calculan solos, sumando los proyectos que cargues en la pestaña <strong>Proyectos</strong>. Primero guardá este trámite; después vas a poder cargarle proyectos.</p>`;
+      }
+      panel.appendChild(nota);
+    }
 
     panelsWrap.appendChild(panel);
   });
@@ -341,6 +353,13 @@ function buildForm(record) {
     verCertBtn.addEventListener('click', () => {
       certTramitePreseleccionado = record._id;
       showView('certificaciones');
+    });
+  }
+  const verProyBtn = document.getElementById('verProyectosBtn');
+  if (verProyBtn) {
+    verProyBtn.addEventListener('click', () => {
+      proyTramitePreseleccionado = record._id;
+      showView('proyectos');
     });
   }
 
@@ -395,10 +414,6 @@ function recalcDerivedFields() {
     setFormValue('fechaFinPlazoAmpliada', addDays(fInicioReal, plazoEntrega + ampliacion));
   }
 
-  // % de IIBB Proyectados respecto IIBB Gestionados = Cant. Total IIBB Proyectados / Cantidades-IIBB del trámite * 100
-  const cantTotalIIBBProy = parseFloat(getFormValue('cantTotalIIBBProyectados')) || 0;
-  const pctIIBB = cantidad > 0 ? (cantTotalIIBBProy / cantidad) * 100 : 0;
-  setFormValue('pctIIBBProyectados', pctIIBB ? pctIIBB.toFixed(2) : '');
 }
 document.getElementById('stagePanels').addEventListener('input', (e) => {
   if (e.target.name && RECALC_TRIGGER_FIELDS.has(e.target.name)) {
@@ -1708,6 +1723,193 @@ function renderCertTable() {
         const data = await apiCall('listar');
         state.registros = data.registros;
         await cargarCertificaciones();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+  });
+}
+
+// ============================================================
+// PROYECTOS
+// ============================================================
+let proyTramitePreseleccionado = null; // seteado desde el botón "Ver / cargar proyectos" del formulario
+let proyTramiteActual = null;          // registro del trámite elegido en esta pestaña
+let proyListaCache = [];               // todos los proyectos ya cargados (para la tabla)
+
+async function abrirVistaProyectos() {
+  document.getElementById('proyFiltroTexto').value = '';
+  await cargarProyectos();
+
+  if (proyTramitePreseleccionado) {
+    const rec = state.registros.find(r => r._id === proyTramitePreseleccionado);
+    proyTramitePreseleccionado = null;
+    if (rec) seleccionarTramiteParaProyecto(rec);
+  } else {
+    document.getElementById('proyTramiteSeleccionado').hidden = true;
+    document.getElementById('proyForm').hidden = true;
+    proyTramiteActual = null;
+  }
+}
+
+async function cargarProyectos() {
+  try {
+    const data = await apiCall('proyectos_listar');
+    proyListaCache = data.proyectos;
+    renderProyTable();
+  } catch (err) {
+    showAppError('No se pudieron cargar los proyectos: ' + err.message);
+  }
+}
+
+// ---- Buscador de trámite ----
+const proyBuscarInput = document.getElementById('proyBuscarTramite');
+proyBuscarInput.addEventListener('input', () => {
+  const q = proyBuscarInput.value.trim().toLowerCase();
+  const resultados = document.getElementById('proyResultadosBusqueda');
+  if (q.length < 2) { resultados.hidden = true; resultados.innerHTML = ''; return; }
+
+  const matches = state.registros.filter(r =>
+    String(r.pospre || '').toLowerCase().includes(q) ||
+    String(r.expediente || '').toLowerCase().includes(q) ||
+    String(r.nroPedidoCompras || '').toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (!matches.length) {
+    resultados.innerHTML = '<div class="cert-search-item">Sin resultados</div>';
+  } else {
+    resultados.innerHTML = matches.map(r => `<div class="cert-search-item" data-id="${r._id}">
+        ${escapeHtml(r.pospre || '(sin pospre)')} — Exp. ${escapeHtml(r.expediente || '—')} — PC ${escapeHtml(r.nroPedidoCompras || '—')}
+        <span class="small">${escapeHtml(r.sucursal || '')} · ${escapeHtml(r.adjudicatario || '(sin contratista)')}</span>
+      </div>`).join('');
+  }
+  resultados.hidden = false;
+
+  resultados.querySelectorAll('[data-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const rec = state.registros.find(r => r._id === el.dataset.id);
+      if (rec) seleccionarTramiteParaProyecto(rec);
+      resultados.hidden = true;
+      proyBuscarInput.value = '';
+    });
+  });
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#proyFormPanel')) {
+    const resultados = document.getElementById('proyResultadosBusqueda');
+    if (resultados) resultados.hidden = true;
+  }
+});
+
+function seleccionarTramiteParaProyecto(rec) {
+  proyTramiteActual = rec;
+  const chip = document.getElementById('proyTramiteSeleccionado');
+  chip.innerHTML = `<span><strong>${escapeHtml(rec.pospre || '')}</strong> — Exp. ${escapeHtml(rec.expediente || '—')} — PC ${escapeHtml(rec.nroPedidoCompras || '—')} — ${escapeHtml(rec.adjudicatario || '(sin contratista)')}</span>
+    <button type="button" class="btn btn-ghost" id="proyCambiarTramiteBtn">Cambiar</button>`;
+  chip.hidden = false;
+  document.getElementById('proyCambiarTramiteBtn').addEventListener('click', () => {
+    proyTramiteActual = null;
+    chip.hidden = true;
+    document.getElementById('proyForm').hidden = true;
+  });
+
+  document.getElementById('proyPospre').value = rec.pospre || '';
+  document.getElementById('proySucursal').value = rec.sucursal || '';
+  document.getElementById('proyPC').value = rec.nroPedidoCompras || '';
+  document.getElementById('proyContratista').value = rec.adjudicatario || '';
+
+  const form = document.getElementById('proyForm');
+  form.reset();
+  document.getElementById('proyFormMsg').hidden = true;
+  form.hidden = false;
+}
+
+document.getElementById('proyCancelarBtn').addEventListener('click', () => {
+  document.getElementById('proyForm').hidden = true;
+  document.getElementById('proyTramiteSeleccionado').hidden = true;
+  proyTramiteActual = null;
+});
+
+document.getElementById('proyForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('proyFormMsg');
+  msg.hidden = true;
+  if (!proyTramiteActual) { return; }
+
+  const datos = {
+    pospre: proyTramiteActual.pospre || '',
+    sucursal: proyTramiteActual.sucursal || '',
+    nroPedidoCompras: proyTramiteActual.nroPedidoCompras || '',
+    contratista: proyTramiteActual.adjudicatario || ''
+  };
+  document.querySelectorAll('#proyForm [name]').forEach(input => { datos[input.name] = input.value; });
+
+  try {
+    await apiCall('proyectos_crear', { datos: Object.assign({ idTramite: proyTramiteActual._id }, datos) });
+    msg.textContent = 'Proyecto guardado correctamente.';
+    msg.className = 'form-msg ok';
+    msg.hidden = false;
+    document.getElementById('proyForm').reset();
+    seleccionarTramiteParaProyecto(proyTramiteActual); // limpia el form pero deja el trámite elegido para cargar otro
+    const data = await apiCall('listar'); // refresca los totales del trámite (rollup)
+    state.registros = data.registros;
+    await cargarProyectos();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'form-msg err';
+    msg.hidden = false;
+  }
+});
+
+document.getElementById('proyFiltroTexto').addEventListener('input', renderProyTable);
+
+const PROY_TABLE_COLS = [
+  { key: 'pospre', label: 'Pospre' },
+  { key: 'sucursal', label: 'Sucursal' },
+  { key: 'nroPedidoCompras', label: 'PC' },
+  { key: 'contratista', label: 'Contratista' },
+  { key: 'nroExpedienteProyecto', label: 'Exp. Proyecto' },
+  { key: 'numeroProyecto', label: 'N° Proyecto' },
+  { key: 'mesAnioKmLAMT', label: 'Mes/Año LAMT' },
+  { key: 'montoKmLAMT', label: '$ Km LAMT' },
+  { key: 'iibbProyecto', label: 'IIBB Proyecto' },
+  { key: 'montoProyecto', label: '$ Proyecto' },
+  { key: 'pctIIBBProyecto', label: '% IIBB' },
+];
+
+function renderProyTable() {
+  const q = document.getElementById('proyFiltroTexto').value.trim().toLowerCase();
+  const rows = proyListaCache.filter(p => {
+    if (!q) return true;
+    return ['pospre','nroPedidoCompras','contratista','numeroProyecto','nroExpedienteProyecto'].some(k =>
+      String(p[k] || '').toLowerCase().includes(q)
+    );
+  }).sort((a, b) => String(b.mesAnioKmLAMT || '').localeCompare(String(a.mesAnioKmLAMT || '')));
+
+  const isAdmin = state.session && state.session.rol === 'admin';
+  const table = document.getElementById('proyTable');
+  const thead = '<thead><tr>' + PROY_TABLE_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th>Descripción</th><th>Observaciones</th>' + (isAdmin ? '<th>Acciones</th>' : '') + '</tr></thead>';
+  const tbody = '<tbody>' + rows.map(p => {
+    const tds = PROY_TABLE_COLS.map(col => {
+      if (['montoKmLAMT','montoProyecto'].includes(col.key)) return `<td>${formatMoney(p[col.key])}</td>`;
+      if (col.key === 'pctIIBBProyecto') return `<td>${num(p.pctIIBBProyecto).toFixed(1)}%</td>`;
+      return `<td>${escapeHtml(p[col.key] != null ? p[col.key] : '')}</td>`;
+    }).join('');
+    const acciones = isAdmin ? `<td><button class="icon-btn danger" data-proy-id="${p._id}" title="Eliminar proyecto">🗑️</button></td>` : '';
+    return `<tr>${tds}<td>${escapeHtml(p.descripcionProyecto || '')}</td><td>${escapeHtml(p.observaciones || '')}</td>${acciones}</tr>`;
+  }).join('') + '</tbody>';
+  table.innerHTML = thead + tbody;
+  setupScrollShadow(table.closest('.table-wrap'));
+
+  table.querySelectorAll('[data-proy-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const confirmado = confirm('¿Eliminar este proyecto? El total del trámite se va a recalcular.');
+      if (!confirmado) return;
+      try {
+        await apiCall('proyectos_eliminar', { id: btn.dataset.proyId });
+        const data = await apiCall('listar');
+        state.registros = data.registros;
+        await cargarProyectos();
       } catch (err) {
         alert('Error: ' + err.message);
       }
