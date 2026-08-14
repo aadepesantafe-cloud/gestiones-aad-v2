@@ -11,7 +11,7 @@ const NUMBER_FIELDS = new Set([
   'anio','plazoEntrega','cantidadesIIBB','presOficialUnitario','presupuestoOficialRubro',
   'adjudicadoUnitario','totalAdjudicado','ampliacionPlazo','cantidadProyectos','kmLineaPC',
   'cantTotalIIBBProyectados','proyectadosAcumulados','pctIIBBProyectados','certificadosAAD',
-  'pctAvanceCertificacion','sumatoriaMultas'
+  'pctAvanceCertificacion','sumatoriaMultas','cantidadCertificadosProcesados'
 ]);
 const CURRENCY_FIELDS = new Set([
   'presOficialUnitario','presupuestoOficialRubro','adjudicadoUnitario','totalAdjudicado',
