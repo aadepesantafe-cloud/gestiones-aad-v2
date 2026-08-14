@@ -207,7 +207,7 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 #chartAdjCertSucursal{ height:380px !important; }
 #chartCertificacion{ height:380px !important; }
 #chartCertificacionPC{ height:380px !important; }
-#chartCertContratista{ height:340px !important; margin-bottom:16px; }
+
 
 /* ============ RESUMEN POR CONTRATISTA ============ */
 .btn-toggle-active{ background:var(--brand); color:#fff; border-color:var(--brand); }

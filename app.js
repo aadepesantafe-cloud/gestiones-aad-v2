@@ -675,7 +675,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartAdjCertSucursal, chartCertificacion, chartCertificacionPC, chartCertContratista;
+let chartMontos, chartAdjCertSucursal, chartCertificacion, chartCertificacionPC;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
@@ -960,59 +960,7 @@ function renderContratistaResumen(rows) {
     avance: v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0
   })).sort((a, b) => b.adjudicado - a.adjudicado);
 
-  const totalAdj = entries.reduce((s, c) => s + c.adjudicado, 0);
-  const totalCert = entries.reduce((s, c) => s + c.certificado, 0);
-  const avanceGeneral = totalAdj > 0 ? (totalCert / totalAdj) * 100 : 0;
-  const mayorCert = entries.length ? entries.slice().sort((a, b) => b.certificado - a.certificado)[0] : null;
-  const conAdjudicado = entries.filter(c => c.adjudicado > 0);
-  const menorAvance = conAdjudicado.length ? conAdjudicado.slice().sort((a, b) => a.avance - b.avance)[0] : null;
-
-  document.getElementById('contratistaKpiRow').innerHTML = [
-    kpiCard('Contratistas', entries.length, ''),
-    kpiCard('Total Adjudicado', formatMillions(totalAdj), ''),
-    kpiCard('Total Certificado', formatMillions(totalCert), ''),
-    kpiCard('Avance General', avanceGeneral.toFixed(1) + '%', ''),
-    kpiCard('Mayor Certificación', mayorCert ? mayorCert.nombre : '—', mayorCert ? formatMillions(mayorCert.certificado) : ''),
-    kpiCard('Menor Avance', menorAvance ? menorAvance.nombre : '—', menorAvance ? menorAvance.avance.toFixed(1) + '%' : ''),
-  ].join('');
-
   const shown = contratistaMode === 'top10' ? entries.slice(0, 10) : entries;
-
-  // ---- Combo: Certificado vs Pendiente (Adjudicado) por Contratista, con % de Avance (semáforo) ----
-  // El gráfico SIEMPRE se limita a un máximo de barras legibles, sin importar el botón Top10/Todos
-  // (que solo controla las tarjetas de abajo) — graficar 100+ contratistas rompe cualquier visual.
-  const MAX_BARRAS_CONTRATISTA = 12;
-  const chartEntries = entries.slice(0, MAX_BARRAS_CONTRATISTA);
-  const nombresCompletos = chartEntries.map(c => c.nombre);
-  const nombresCortos = chartEntries.map(c => truncateLabel(c.nombre, 16));
-
-  const ctxCC = document.getElementById('chartCertContratista').getContext('2d');
-  if (chartCertContratista) chartCertContratista.destroy();
-  chartCertContratista = new Chart(ctxCC, {
-    type: 'bar',
-    data: {
-      labels: nombresCortos,
-      datasets: [
-        { type:'bar', label:'Adjudicado', data: chartEntries.map(c => c.adjudicado / 1000000), backgroundColor:'#CBD5E1', order:2 },
-        { type:'bar', label:'Certificado', data: chartEntries.map(c => c.certificado / 1000000), backgroundColor: chartEntries.map(c => semColor(c.avance)), order:2 },
-        { type:'line', label:'% Avance', data: chartEntries.map(c => c.avance), yAxisID:'y1', borderColor:'#64748B', tension:0.3,
-          pointRadius:5, pointBackgroundColor: chartEntries.map(c => semColor(c.avance)), pointBorderColor: chartEntries.map(c => semColor(c.avance)), order:1 }
-      ]
-    },
-    plugins: [pointLabelPlugin],
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      scales:{
-        x:{ ticks:{ autoSkip:false, maxRotation:45, minRotation:30, font:{ size:10 } } },
-        y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } },
-        y1:{ beginAtZero:true, max:130, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
-      },
-      plugins:{
-        legend:{ position:'bottom' },
-        tooltip:{ callbacks:{ title: (items) => nombresCompletos[items[0].dataIndex] || '' } }
-      }
-    }
-  });
 
   const grid = document.getElementById('contratistaGrid');
   grid.innerHTML = shown.length ? shown.map((c, idx) => {
