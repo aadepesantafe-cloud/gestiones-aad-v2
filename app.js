@@ -190,6 +190,7 @@ function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.hidden = (v.id !== 'view-' + name));
   if (name === 'dashboard') renderDashboard();
   if (name === 'registros') renderRegistros();
+  if (name === 'vencimientos') renderCalendar();
   if (name === 'usuarios') renderUsuarios();
 }
 
