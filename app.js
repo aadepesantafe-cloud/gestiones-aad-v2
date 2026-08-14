@@ -37,11 +37,11 @@ const DYNAMIC_SELECT_FIELDS = new Set(['pospre']);
 const LONG_FIELDS = new Set(['detalleRubro','observaciones']);
 
 // ---- Campos calculados automáticamente: no se editan a mano ----
-const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion','pctIIBBProyectados']);
+const DERIVED_FIELDS = new Set(['presupuestoOficialRubro','totalAdjudicado','fechaFinContrato','fechaFinPlazoAmpliada','pctAvanceCertificacion','pctIIBBProyectados','certificadosAAD','sumatoriaMultas','cantidadCertificadosProcesados']);
 // Campos "fuente" que, al cambiar, disparan el recálculo
-const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','certificadosAAD','cantTotalIIBBProyectados']);
+const RECALC_TRIGGER_FIELDS = new Set(['cantidadesIIBB','presOficialUnitario','adjudicadoUnitario','fechaInicioReal','plazoEntrega','ampliacionPlazo','cantTotalIIBBProyectados']);
 // Campos "acumulador": tienen un mini sumador al lado para ir agregando valores sin calcular a mano
-const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados','certificadosAAD','sumatoriaMultas']);
+const SUM_HELPER_FIELDS = new Set(['cantTotalIIBBProyectados','proyectadosAcumulados']);
 
 const FILTER_KEYS = ['pospre','expediente','anio','nroPedidoCompras','adjudicatario','sucursal','rubro','estado'];
 
@@ -191,6 +191,7 @@ function showView(name) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'registros') renderRegistros();
   if (name === 'vencimientos') renderCalendar();
+  if (name === 'certificaciones') abrirVistaCertificaciones();
   if (name === 'usuarios') renderUsuarios();
 }
 
@@ -319,8 +320,29 @@ function buildForm(record) {
       grid.appendChild(buildFieldInput(f, record));
     });
     panel.appendChild(grid);
+
+    if (etapa.id === 'certificacion') {
+      const nota = document.createElement('div');
+      nota.className = 'cert-nota';
+      if (record._id) {
+        nota.innerHTML = `<p>Estos valores se calculan solos, sumando las certificaciones cargadas en la pestaña <strong>Certificaciones</strong>.</p>
+          <button type="button" class="btn btn-secondary" id="verCertificacionesBtn">Ver / cargar certificaciones de este trámite</button>`;
+      } else {
+        nota.innerHTML = `<p>Estos valores se calculan solos, sumando las certificaciones que cargues en la pestaña <strong>Certificaciones</strong>. Primero guardá este trámite; después vas a poder cargarle certificaciones.</p>`;
+      }
+      panel.appendChild(nota);
+    }
+
     panelsWrap.appendChild(panel);
   });
+
+  const verCertBtn = document.getElementById('verCertificacionesBtn');
+  if (verCertBtn) {
+    verCertBtn.addEventListener('click', () => {
+      certTramitePreseleccionado = record._id;
+      showView('certificaciones');
+    });
+  }
 
   // Si cambia el Pospre elegido, re-evaluar si Proyectos aplica (solo O.D.P / O.D.S = Obra Menor)
   const pospreInput = panelsWrap.querySelector('[name="pospre"]');
@@ -371,19 +393,6 @@ function recalcDerivedFields() {
   if (fInicioReal) {
     setFormValue('fechaFinContrato', addDays(fInicioReal, plazoEntrega));
     setFormValue('fechaFinPlazoAmpliada', addDays(fInicioReal, plazoEntrega + ampliacion));
-  }
-
-  const certificado = parseFloat(getFormValue('certificadosAAD')) || 0;
-  const pct = totalAdj > 0 ? (certificado / totalAdj) * 100 : 0;
-  setFormValue('pctAvanceCertificacion', pct ? pct.toFixed(2) : '');
-
-  // Aviso visual: un % de avance fuera de rango razonable casi siempre indica un dato mal
-  // cargado en Cantidad/IIBB o $ Adjudicado Unitario (no un error de fórmula).
-  const pctEl = document.querySelector('#stagePanels [name="pctAvanceCertificacion"]');
-  if (pctEl) {
-    const fueraDeRango = pct > 200 || pct < 0;
-    pctEl.classList.toggle('valor-sospechoso', fueraDeRango);
-    pctEl.title = fueraDeRango ? 'Este % parece incorrecto. Revisá Cantidad/IIBB y $ Adjudicado Unitario de este trámite.' : '';
   }
 
   // % de IIBB Proyectados respecto IIBB Gestionados = Cant. Total IIBB Proyectados / Cantidades-IIBB del trámite * 100
@@ -1516,4 +1525,192 @@ function escapeHtml(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, s => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
   }[s]));
+}
+
+// ============================================================
+// CERTIFICACIONES
+// ============================================================
+let certTramitePreseleccionado = null; // seteado desde el botón "Ver / cargar certificaciones" del formulario
+let certTramiteActual = null;          // registro del trámite elegido en esta pestaña
+let certListaCache = [];               // todas las certificaciones ya cargadas (para la tabla)
+
+async function abrirVistaCertificaciones() {
+  document.getElementById('certFiltroTexto').value = '';
+  await cargarCertificaciones();
+
+  if (certTramitePreseleccionado) {
+    const rec = state.registros.find(r => r._id === certTramitePreseleccionado);
+    certTramitePreseleccionado = null;
+    if (rec) seleccionarTramiteParaCertificar(rec);
+  } else {
+    document.getElementById('certTramiteSeleccionado').hidden = true;
+    document.getElementById('certForm').hidden = true;
+    certTramiteActual = null;
+  }
+}
+
+async function cargarCertificaciones() {
+  try {
+    const data = await apiCall('certificaciones_listar');
+    certListaCache = data.certificaciones;
+    renderCertTable();
+  } catch (err) {
+    showAppError('No se pudieron cargar las certificaciones: ' + err.message);
+  }
+}
+
+// ---- Buscador de trámite ----
+const certBuscarInput = document.getElementById('certBuscarTramite');
+certBuscarInput.addEventListener('input', () => {
+  const q = certBuscarInput.value.trim().toLowerCase();
+  const resultados = document.getElementById('certResultadosBusqueda');
+  if (q.length < 2) { resultados.hidden = true; resultados.innerHTML = ''; return; }
+
+  const matches = state.registros.filter(r =>
+    String(r.pospre || '').toLowerCase().includes(q) ||
+    String(r.expediente || '').toLowerCase().includes(q) ||
+    String(r.nroPedidoCompras || '').toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (!matches.length) {
+    resultados.innerHTML = '<div class="cert-search-item">Sin resultados</div>';
+  } else {
+    resultados.innerHTML = matches.map(r => `<div class="cert-search-item" data-id="${r._id}">
+        ${escapeHtml(r.pospre || '(sin pospre)')} — Exp. ${escapeHtml(r.expediente || '—')} — PC ${escapeHtml(r.nroPedidoCompras || '—')}
+        <span class="small">${escapeHtml(r.sucursal || '')} · ${escapeHtml(r.adjudicatario || '(sin contratista)')}</span>
+      </div>`).join('');
+  }
+  resultados.hidden = false;
+
+  resultados.querySelectorAll('[data-id]').forEach(el => {
+    el.addEventListener('click', () => {
+      const rec = state.registros.find(r => r._id === el.dataset.id);
+      if (rec) seleccionarTramiteParaCertificar(rec);
+      resultados.hidden = true;
+      certBuscarInput.value = '';
+    });
+  });
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#certFormPanel')) {
+    const resultados = document.getElementById('certResultadosBusqueda');
+    if (resultados) resultados.hidden = true;
+  }
+});
+
+function seleccionarTramiteParaCertificar(rec) {
+  certTramiteActual = rec;
+  const chip = document.getElementById('certTramiteSeleccionado');
+  chip.innerHTML = `<span><strong>${escapeHtml(rec.pospre || '')}</strong> — Exp. ${escapeHtml(rec.expediente || '—')} — PC ${escapeHtml(rec.nroPedidoCompras || '—')} — ${escapeHtml(rec.adjudicatario || '(sin contratista)')}</span>
+    <button type="button" class="btn btn-ghost" id="certCambiarTramiteBtn">Cambiar</button>`;
+  chip.hidden = false;
+  document.getElementById('certCambiarTramiteBtn').addEventListener('click', () => {
+    certTramiteActual = null;
+    chip.hidden = true;
+    document.getElementById('certForm').hidden = true;
+  });
+
+  document.getElementById('certPospre').value = rec.pospre || '';
+  document.getElementById('certExpediente').value = rec.expediente || '';
+  document.getElementById('certPC').value = rec.nroPedidoCompras || '';
+  document.getElementById('certContratista').value = rec.adjudicatario || '';
+  document.getElementById('certFechaInicio').value = rec.fechaInicioReal || '';
+
+  const form = document.getElementById('certForm');
+  form.reset();
+  document.getElementById('certFormMsg').hidden = true;
+  form.hidden = false;
+}
+
+document.getElementById('certCancelarBtn').addEventListener('click', () => {
+  document.getElementById('certForm').hidden = true;
+  document.getElementById('certTramiteSeleccionado').hidden = true;
+  certTramiteActual = null;
+});
+
+document.getElementById('certForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('certFormMsg');
+  msg.hidden = true;
+  if (!certTramiteActual) { return; }
+
+  const datos = {
+    pospre: certTramiteActual.pospre || '',
+    expediente: certTramiteActual.expediente || '',
+    nroPedidoCompras: certTramiteActual.nroPedidoCompras || '',
+    contratista: certTramiteActual.adjudicatario || '',
+    fechaInicioContrato: certTramiteActual.fechaInicioReal || ''
+  };
+  document.querySelectorAll('#certForm [name]').forEach(input => { datos[input.name] = input.value; });
+
+  try {
+    await apiCall('certificaciones_crear', { datos: Object.assign({ idTramite: certTramiteActual._id }, datos) });
+    msg.textContent = 'Certificación guardada correctamente.';
+    msg.className = 'form-msg ok';
+    msg.hidden = false;
+    document.getElementById('certForm').reset();
+    seleccionarTramiteParaCertificar(certTramiteActual); // limpia el form pero deja el trámite elegido para cargar otra
+    const data = await apiCall('listar'); // refresca los totales del trámite (rollup)
+    state.registros = data.registros;
+    await cargarCertificaciones();
+  } catch (err) {
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'form-msg err';
+    msg.hidden = false;
+  }
+});
+
+document.getElementById('certFiltroTexto').addEventListener('input', renderCertTable);
+
+const CERT_TABLE_COLS = [
+  { key: 'pospre', label: 'Pospre' },
+  { key: 'expediente', label: 'Expediente' },
+  { key: 'nroPedidoCompras', label: 'PC' },
+  { key: 'contratista', label: 'Contratista' },
+  { key: 'numeroCertificado', label: 'N° Certificado' },
+  { key: 'mesAnioCertificacion', label: 'Mes/Año' },
+  { key: 'montoCertificado', label: '$ Certificado' },
+  { key: 'montoReconocimiento', label: '$ Reconocimiento' },
+  { key: 'montoMultas', label: '$ Multas' },
+  { key: 'pctAvance', label: '% Avance' },
+];
+
+function renderCertTable() {
+  const q = document.getElementById('certFiltroTexto').value.trim().toLowerCase();
+  const rows = certListaCache.filter(c => {
+    if (!q) return true;
+    return ['pospre','expediente','nroPedidoCompras','contratista','numeroCertificado'].some(k =>
+      String(c[k] || '').toLowerCase().includes(q)
+    );
+  }).sort((a, b) => String(b.mesAnioCertificacion || '').localeCompare(String(a.mesAnioCertificacion || '')));
+
+  const isAdmin = state.session && state.session.rol === 'admin';
+  const table = document.getElementById('certTable');
+  const thead = '<thead><tr>' + CERT_TABLE_COLS.map(c => `<th>${c.label}</th>`).join('') + '<th>Observaciones</th>' + (isAdmin ? '<th>Acciones</th>' : '') + '</tr></thead>';
+  const tbody = '<tbody>' + rows.map(c => {
+    const tds = CERT_TABLE_COLS.map(col => {
+      if (['montoCertificado','montoReconocimiento','montoMultas'].includes(col.key)) return `<td>${formatMoney(c[col.key])}</td>`;
+      if (col.key === 'pctAvance') return `<td>${num(c.pctAvance).toFixed(1)}%</td>`;
+      return `<td>${escapeHtml(c[col.key] != null ? c[col.key] : '')}</td>`;
+    }).join('');
+    const acciones = isAdmin ? `<td><button class="icon-btn danger" data-cert-id="${c._id}" title="Eliminar certificación">🗑️</button></td>` : '';
+    return `<tr>${tds}<td>${escapeHtml(c.observaciones || '')}</td>${acciones}</tr>`;
+  }).join('') + '</tbody>';
+  table.innerHTML = thead + tbody;
+  setupScrollShadow(table.closest('.table-wrap'));
+
+  table.querySelectorAll('[data-cert-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const confirmado = confirm('¿Eliminar esta certificación? El total del trámite se va a recalcular.');
+      if (!confirmado) return;
+      try {
+        await apiCall('certificaciones_eliminar', { id: btn.dataset.certId });
+        const data = await apiCall('listar');
+        state.registros = data.registros;
+        await cargarCertificaciones();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    });
+  });
 }

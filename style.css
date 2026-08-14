@@ -472,6 +472,29 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
 .btn-mini-add:hover{ background:var(--stage-4); color:#fff; border-color:var(--stage-4); }
 .field-grid textarea{ resize:vertical; min-height:60px; }
 .form-actions{ display:flex; align-items:center; gap:16px; justify-content:flex-end; }
+.cert-nota{
+  margin-top:16px; padding:14px 16px; background:var(--brand-soft);
+  border:1px solid var(--border); border-radius:9px;
+}
+.cert-nota p{ margin:0 0 10px; font-size:13px; color:var(--brand-dark); }
+.cert-nota p:last-child{ margin-bottom:0; }
+
+/* ============ MÓDULO CERTIFICACIONES ============ */
+.cert-search-results{
+  position:absolute; z-index:20; margin-top:4px; width:100%; max-width:520px;
+  max-height:240px; overflow-y:auto; background:#fff; border:1px solid var(--border);
+  border-radius:9px; box-shadow:0 10px 30px rgba(3,20,28,0.15);
+}
+.cert-search-item{ padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border); }
+.cert-search-item:last-child{ border-bottom:none; }
+.cert-search-item:hover{ background:var(--brand-soft); }
+.cert-search-item .small{ display:block; font-size:11.5px; color:var(--text-soft); margin-top:2px; }
+.cert-tramite-chip{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--brand-soft); border:1px solid var(--border); border-radius:9px;
+  padding:10px 14px; margin:12px 0; font-size:13px;
+}
+.cert-tramite-chip button{ flex-shrink:0; }
 .form-msg{ font-size:13px; margin:0; }
 .form-msg.ok{ color:#166534; }
 .form-msg.err{ color:var(--danger); }

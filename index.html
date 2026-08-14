@@ -70,6 +70,9 @@
       <button class="nav-btn" data-view="vencimientos">
         <span class="nav-icon">▦</span> Vencimientos
       </button>
+      <button class="nav-btn" data-view="certificaciones">
+        <span class="nav-icon">✓</span> Certificaciones
+      </button>
       <button class="nav-btn" data-view="formulario">
         <span class="nav-icon">＋</span> Nuevo trámite
       </button>
@@ -259,6 +262,61 @@
         </div>
         <div class="calendar-grid" id="calendarGrid"></div>
         <div id="calendarDayDetail" class="calendar-day-detail" hidden></div>
+      </div>
+    </section>
+
+    <!-- ---------- CERTIFICACIONES ---------- -->
+    <section id="view-certificaciones" class="view" hidden>
+      <div class="view-header">
+        <h2>Certificaciones</h2>
+      </div>
+
+      <div class="panel" id="certFormPanel">
+        <h3>Cargar certificación</h3>
+
+        <div class="field-grid">
+          <label class="span-2" style="position:relative;">Buscar trámite (Pospre, Expediente o N° Pedido de Compras)
+            <input type="text" id="certBuscarTramite" placeholder="Escribí para buscar..." autocomplete="off" />
+            <div id="certResultadosBusqueda" class="cert-search-results" hidden></div>
+          </label>
+        </div>
+
+        <div id="certTramiteSeleccionado" class="cert-tramite-chip" hidden></div>
+
+        <form id="certForm" hidden>
+          <div class="field-grid">
+            <label>Pospre <input type="text" id="certPospre" readonly /></label>
+            <label>Expediente <input type="text" id="certExpediente" readonly /></label>
+            <label>Pedido de Compras <input type="text" id="certPC" readonly /></label>
+            <label>Contratista <input type="text" id="certContratista" readonly /></label>
+            <label>Fecha de Inicio de Contrato <input type="text" id="certFechaInicio" readonly /></label>
+            <label>Número de Certificado <input type="text" name="numeroCertificado" /></label>
+            <label>Mes/Año de Certificación <input type="month" name="mesAnioCertificacion" /></label>
+            <label>IIBB Certificados <input type="number" step="any" name="iibbCertificados" /></label>
+            <label>$ Certificados <input type="number" step="any" name="montoCertificado" /></label>
+            <label>$ de Reconocimiento <input type="number" step="any" name="montoReconocimiento" /></label>
+            <label>$ Multas <input type="number" step="any" name="montoMultas" /></label>
+            <label class="span-2">Observaciones <textarea name="observaciones"></textarea></label>
+          </div>
+          <div class="form-actions">
+            <p id="certFormMsg" class="form-msg" hidden></p>
+            <button type="button" id="certCancelarBtn" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar certificación</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h3>Certificaciones cargadas</h3>
+        <div class="filters-bar">
+          <div class="filter-field">
+            <label>Buscar</label>
+            <input type="text" id="certFiltroTexto" placeholder="Pospre, expediente, contratista..." />
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="certTable" class="data-table"></table>
+        </div>
       </div>
     </section>
 
