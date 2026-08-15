@@ -316,12 +316,17 @@ button, input, select, textarea{ font-family:inherit; font-size:inherit; }
   flex-shrink:0;
 }
 .ms-search:focus{ outline:2px solid var(--brand); outline-offset:1px; }
-.ms-clear{
-  display:block; width:100%; text-align:left; background:none; border:none;
-  padding:6px 8px; font-size:12px; font-weight:600; color:var(--brand);
-  border-bottom:1px solid var(--border); margin-bottom:4px; cursor:pointer; flex-shrink:0;
+.ms-actions{
+  display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:4px; flex-shrink:0;
 }
-.ms-clear:hover{ background:var(--brand-soft); border-radius:6px 6px 0 0; }
+.ms-actions button{
+  flex:1; text-align:center; background:none; border:none;
+  padding:6px 4px; font-size:11.5px; font-weight:600; cursor:pointer;
+}
+.ms-selectall{ color:var(--stage-4); }
+.ms-selectall:hover{ background:#E6F5F3; border-radius:6px 0 0 0; }
+.ms-clear{ color:var(--brand); }
+.ms-clear:hover{ background:var(--brand-soft); border-radius:0 6px 0 0; }
 .ms-options{ overflow-y:auto; }
 .ms-option{
   display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px;

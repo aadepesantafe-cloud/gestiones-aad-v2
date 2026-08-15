@@ -539,8 +539,9 @@ function closeAllMultiselects(except) {
 }
 document.addEventListener('click', () => closeAllMultiselects());
 
-function msLabel(selected) {
+function msLabel(selected, total) {
   if (!selected || selected.length === 0) return 'Todos';
+  if (total && selected.length === total) return 'Todos (' + total + ')';
   if (selected.length === 1) return selected[0];
   return selected.length + ' seleccionados';
 }
@@ -551,11 +552,15 @@ function getCheckedValues(el) {
 
 function renderMultiselect(el, options, selected, onChange) {
   const sel = new Set(selected || []);
+  el._msTotalOptions = options.length; // se actualiza en cada render, para que los listeners (registrados una sola vez) sepan el total vigente
   el.innerHTML =
-    '<button type="button" class="ms-toggle"><span class="ms-toggle-label">' + escapeHtml(msLabel(selected)) + '</span><span class="ms-caret">▾</span></button>' +
+    '<button type="button" class="ms-toggle"><span class="ms-toggle-label">' + escapeHtml(msLabel(selected, options.length)) + '</span><span class="ms-caret">▾</span></button>' +
     '<div class="ms-panel">' +
       (options.length > 6 ? '<input type="text" class="ms-search" placeholder="Buscar..." />' : '') +
-      '<button type="button" class="ms-clear">Limpiar selección</button>' +
+      '<div class="ms-actions">' +
+        '<button type="button" class="ms-selectall">Marcar todos</button>' +
+        '<button type="button" class="ms-clear">Limpiar selección</button>' +
+      '</div>' +
       '<div class="ms-options">' +
       (options.length
         ? options.map(o => '<label class="ms-option"><input type="checkbox" value="' + escapeHtml(o) + '" ' + (sel.has(o) ? 'checked' : '') + '/><span>' + escapeHtml(o) + '</span></label>').join('')
@@ -582,6 +587,12 @@ function renderMultiselect(el, options, selected, onChange) {
         const label = el.querySelector('.ms-toggle-label');
         if (label) label.textContent = 'Todos';
         el._msOnChange && el._msOnChange([]);
+      } else if (e.target.closest('.ms-selectall')) {
+        el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true); // tilda TODAS las opciones, aunque el buscador esté filtrando la vista
+        const checked = getCheckedValues(el);
+        const label = el.querySelector('.ms-toggle-label');
+        if (label) label.textContent = msLabel(checked, el._msTotalOptions);
+        el._msOnChange && el._msOnChange(checked);
       }
     });
     el.addEventListener('input', (e) => {
@@ -593,7 +604,7 @@ function renderMultiselect(el, options, selected, onChange) {
       if (e.target.matches('input[type=checkbox]')) {
         const checked = getCheckedValues(el);
         const label = el.querySelector('.ms-toggle-label');
-        if (label) label.textContent = msLabel(checked);
+        if (label) label.textContent = msLabel(checked, el._msTotalOptions);
         el._msOnChange && el._msOnChange(checked);
       }
     });
