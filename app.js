@@ -1288,8 +1288,8 @@ function renderDashboard() {
       pct: v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0,
       detalle: listaCortaPC(v.sucursales) + ' · ' + listaCortaPC(v.contratistas)
     }))
-    .sort((a,b) => b.pct - a.pct)
-    .slice(0, 15);
+    .sort((a,b) => a.pct - b.pct)
+    .slice(0, 13);
 
   const EJE_MAX_PC = 130;
   const pctRealPC = pcEntries.map(e => e.pct);
