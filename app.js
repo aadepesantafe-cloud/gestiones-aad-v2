@@ -191,6 +191,7 @@ function showView(name) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'registros') renderRegistros();
   if (name === 'vencimientos') renderCalendar();
+  if (name === 'aperturas') renderCalendarApertura();
   if (name === 'certificaciones') abrirVistaCertificaciones();
   if (name === 'proyectos') abrirVistaProyectos();
   if (name === 'usuarios') renderUsuarios();
@@ -779,6 +780,88 @@ function mostrarDetalleDia(eventos, fechaStr) {
   detailBox.hidden = false;
 }
 
+// ============================================================
+// CALENDARIO DE APERTURAS (el otro extremo de la vida del trámite)
+// ============================================================
+let calAperturaMonthDate = new Date(); calAperturaMonthDate.setDate(1);
+let calAperturaSelectedDay = null;
+
+document.getElementById('calAperturaPrevBtn').addEventListener('click', () => {
+  calAperturaMonthDate.setMonth(calAperturaMonthDate.getMonth() - 1);
+  calAperturaSelectedDay = null;
+  renderCalendarApertura();
+});
+document.getElementById('calAperturaNextBtn').addEventListener('click', () => {
+  calAperturaMonthDate.setMonth(calAperturaMonthDate.getMonth() + 1);
+  calAperturaSelectedDay = null;
+  renderCalendarApertura();
+});
+document.getElementById('calAperturaTodayBtn').addEventListener('click', () => {
+  calAperturaMonthDate = new Date(); calAperturaMonthDate.setDate(1);
+  calAperturaSelectedDay = null;
+  renderCalendarApertura();
+});
+
+function renderCalendarApertura() {
+  const rows = filteredForDashboardBase(); // respeta filtros del dashboard
+  const porDia = {};
+  rows.forEach(r => {
+    const fecha = r.fechaPedidoCompras;
+    if (!fecha) return;
+    if (!porDia[fecha]) porDia[fecha] = [];
+    porDia[fecha].push(r);
+  });
+
+  document.getElementById('calAperturaMonthLabel').textContent = MESES_ES[calAperturaMonthDate.getMonth()] + ' ' + calAperturaMonthDate.getFullYear();
+
+  const year = calAperturaMonthDate.getFullYear();
+  const month = calAperturaMonthDate.getMonth();
+  const primerDiaSemana = (new Date(year, month, 1).getDay() + 6) % 7; // 0=lunes
+  const diasEnMes = new Date(year, month + 1, 0).getDate();
+  const hoyStr = new Date().toISOString().slice(0, 10);
+
+  const grid = document.getElementById('calendarAperturaGrid');
+  let html = '';
+  for (let i = 0; i < primerDiaSemana; i++) html += '<div class="cal-day cal-empty"></div>';
+
+  for (let d = 1; d <= diasEnMes; d++) {
+    const fechaStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const eventos = porDia[fechaStr] || [];
+    const esHoy = fechaStr === hoyStr;
+    const badges = eventos.length ? `<span class="cal-badge cal-badge-apertura">${eventos.length}</span>` : '';
+    html += `<div class="cal-day ${esHoy ? 'cal-today' : ''} ${eventos.length ? 'cal-has-events' : ''}" data-fecha="${fechaStr}">
+      <div class="cal-day-num">${d}</div>
+      <div class="cal-day-badges">${badges}</div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.cal-has-events').forEach(el => {
+    el.addEventListener('click', () => {
+      calAperturaSelectedDay = el.dataset.fecha;
+      mostrarDetalleDiaApertura(porDia[calAperturaSelectedDay], calAperturaSelectedDay);
+    });
+  });
+
+  const detailBox = document.getElementById('calendarAperturaDayDetail');
+  if (calAperturaSelectedDay && porDia[calAperturaSelectedDay]) {
+    mostrarDetalleDiaApertura(porDia[calAperturaSelectedDay], calAperturaSelectedDay);
+  } else {
+    detailBox.hidden = true;
+  }
+}
+
+function mostrarDetalleDiaApertura(eventos, fechaStr) {
+  const detailBox = document.getElementById('calendarAperturaDayDetail');
+  const fechaLegible = new Date(fechaStr + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  detailBox.innerHTML = `<h4>Se abrieron el ${fechaLegible} (${eventos.length})</h4>` +
+    eventos.map(r => `<div class="cal-detail-item">
+        <span>${escapeHtml(r.pospre || '(sin pospre)')} — ${escapeHtml(r.adjudicatario || '(sin contratista)')} — ${escapeHtml(r.sucursal || '')}</span>
+        <b>${escapeHtml(r.expediente || '')}</b>
+      </div>`).join('');
+  detailBox.hidden = false;
+}
+
 function filteredForDashboardBase() {
   let rows = applyFilters(state.registros, state.dashFiltros, DASH_FILTER_KEYS);
   const desde = state.dashFiltros.fechaPCDesde;
@@ -1017,13 +1100,39 @@ const pointLabelPlugin = {
       const meta = chart.getDatasetMeta(i);
       if (meta.hidden) return;
       meta.data.forEach((point, index) => {
-        const value = dataset.data[index];
+        // Si el dataset trae "rawData" (valor real, sin recortar para el eje), se muestra ese en la etiqueta
+        const value = dataset.rawData ? dataset.rawData[index] : dataset.data[index];
         if (value == null) return;
+        const sospechoso = value > 110;
         ctx.save();
-        ctx.fillStyle = '#16202A';
+        ctx.fillStyle = sospechoso ? '#7C3AED' : '#16202A';
         ctx.font = '600 11px "IBM Plex Sans", sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(value.toFixed(1) + '%', point.x, point.y - 12);
+        ctx.fillText((sospechoso ? '⚠ ' : '') + value.toFixed(1) + '%', point.x, point.y - 12);
+        ctx.restore();
+      });
+    });
+  }
+};
+
+// ---- Dibuja el valor al final de cada barra (para gráficos de barras horizontales tipo ranking) ----
+const barEndLabelPlugin = {
+  id: 'barEndLabelPlugin',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    chart.data.datasets.forEach((dataset, i) => {
+      const meta = chart.getDatasetMeta(i);
+      if (meta.hidden) return;
+      meta.data.forEach((bar, index) => {
+        const value = dataset.rawData ? dataset.rawData[index] : dataset.data[index];
+        if (value == null) return;
+        const sospechoso = value > 110;
+        ctx.save();
+        ctx.fillStyle = sospechoso ? '#7C3AED' : '#16202A';
+        ctx.font = '600 11px "IBM Plex Sans", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText((sospechoso ? '⚠ ' : '') + value.toFixed(1) + '%', bar.x + 6, bar.y);
         ctx.restore();
       });
     });
@@ -1112,6 +1221,12 @@ function renderDashboard() {
   // ---- Combo: Adjudicado vs Certificado por Sucursal, con % de Avance (semáforo) ----
   const pctPorSucursal = sucursalEntries.map(e => e[1].adjudicado > 0 ? (e[1].certificado / e[1].adjudicado) * 100 : 0);
   const promedioAvanceSucursal = totalAdjudicado > 0 ? (totalCertificado / totalAdjudicado) * 100 : 0;
+  const UMBRAL_SOSPECHOSO = 110; // por encima de esto, casi seguro hay un dato mal cargado (Cantidad/Unitario) en algún trámite de esa sucursal
+  const EJE_MAX = 130;
+  // La línea se dibuja recortada al máximo del eje (para que nunca "se dispare" visualmente),
+  // pero la etiqueta sobre cada punto sigue mostrando el valor real, marcado con ⚠ si es sospechoso.
+  const pctParaGraficar = pctPorSucursal.map(p => Math.min(p, EJE_MAX));
+  const colorPorSucursal = pctPorSucursal.map(p => p > UMBRAL_SOSPECHOSO ? '#7C3AED' : semColor(p));
 
   const ctxAC = document.getElementById('chartAdjCertSucursal').getContext('2d');
   if (chartAdjCertSucursal) chartAdjCertSucursal.destroy();
@@ -1122,9 +1237,9 @@ function renderDashboard() {
       datasets: [
         { type:'bar', label:'Adjudicado', data: sucursalEntries.map(e => e[1].adjudicado / 1000000), backgroundColor:'#93C5FD', order:2 },
         { type:'bar', label:'Certificado', data: sucursalEntries.map(e => e[1].certificado / 1000000), backgroundColor:'#6EE7B7', order:2 },
-        { type:'line', label:'% Avance por Sucursal', data: pctPorSucursal, yAxisID:'y1', borderColor:'#64748B', tension:0.3,
-          pointRadius:5, pointBackgroundColor: pctPorSucursal.map(semColor), pointBorderColor: pctPorSucursal.map(semColor), order:1 },
-        { type:'line', label:'Promedio General (' + promedioAvanceSucursal.toFixed(0) + '%)', data: sucursalEntries.map(() => promedioAvanceSucursal),
+        { type:'line', label:'% Avance por Sucursal', data: pctParaGraficar, rawData: pctPorSucursal, yAxisID:'y1', borderColor:'#64748B', tension:0.3,
+          pointRadius:5, pointBackgroundColor: colorPorSucursal, pointBorderColor: colorPorSucursal, order:1 },
+        { type:'line', label:'Promedio General (' + promedioAvanceSucursal.toFixed(0) + '%)', data: sucursalEntries.map(() => Math.min(promedioAvanceSucursal, EJE_MAX)),
           yAxisID:'y1', borderColor:'#D97706', borderDash:[6,4], pointRadius:0, order:0 }
       ]
     },
@@ -1134,50 +1249,80 @@ function renderDashboard() {
       scales:{
         x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30 } },
         y:{ beginAtZero:true, title:{ display:true, text:'Millones de $' } },
-        y1:{ beginAtZero:true, max:130, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
+        y1:{ beginAtZero:true, max:EJE_MAX, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% Avance' } }
       },
       plugins:{ legend:{ position:'bottom' } }
     }
   });
 
-  // ---- Gráfico: % de Certificación por Pedido de Compras (curva) ----
+  const notaSospechosos = document.getElementById('chartAdjCertNota');
+  const sucursalesSospechosas = sucursalEntries
+    .map((e, i) => ({ nombre: e[0], pct: pctPorSucursal[i] }))
+    .filter(s => s.pct > UMBRAL_SOSPECHOSO);
+  if (sucursalesSospechosas.length) {
+    notaSospechosos.innerHTML = '⚠ Valores fuera de rango (revisar Cantidad/IIBB o $ Adjudicado Unitario en los trámites de estas sucursales): ' +
+      sucursalesSospechosas.map(s => `<strong>${escapeHtml(s.nombre)}</strong> (${s.pct.toFixed(0)}%)`).join(', ');
+    notaSospechosos.hidden = false;
+  } else {
+    notaSospechosos.hidden = true;
+  }
+
+  // ---- Gráfico: % de Certificación por Pedido de Compras (barras horizontales, con Sucursal/Contratista) ----
   const byPC = {};
   rows.forEach(r => {
     if (!r.nroPedidoCompras) return;
     const key = String(r.nroPedidoCompras).trim();
-    if (!byPC[key]) byPC[key] = { adjudicado:0, certificado:0 };
+    if (!byPC[key]) byPC[key] = { adjudicado:0, certificado:0, sucursales:new Set(), contratistas:new Set() };
     byPC[key].adjudicado += num(r.totalAdjudicado);
     byPC[key].certificado += num(r.certificadosAAD);
+    if (r.sucursal) byPC[key].sucursales.add(r.sucursal.trim());
+    if (r.adjudicatario) byPC[key].contratistas.add(r.adjudicatario.trim());
   });
+  const listaCortaPC = (set, max = 2) => {
+    const arr = Array.from(set);
+    return arr.length <= max ? arr.join(', ') : arr.slice(0, max).join(', ') + ' +' + (arr.length - max);
+  };
   const pcEntries = Object.entries(byPC)
-    .map(([k, v]) => [k, v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0])
-    .sort((a,b) => b[1] - a[1])
+    .map(([k, v]) => ({
+      pc: k,
+      pct: v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0,
+      detalle: listaCortaPC(v.sucursales) + ' · ' + listaCortaPC(v.contratistas)
+    }))
+    .sort((a,b) => b.pct - a.pct)
     .slice(0, 15);
+
+  const EJE_MAX_PC = 130;
+  const pctRealPC = pcEntries.map(e => e.pct);
+  const pctGraficarPC = pctRealPC.map(p => Math.min(p, EJE_MAX_PC));
+  const colorPorPC = pctRealPC.map(p => p > 110 ? '#7C3AED' : semColor(p));
 
   const ctx5 = document.getElementById('chartCertificacionPC').getContext('2d');
   if (chartCertificacionPC) chartCertificacionPC.destroy();
   chartCertificacionPC = new Chart(ctx5, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: pcEntries.map(e => e[0]),
+      labels: pcEntries.map(e => ['PC ' + e.pc, e.detalle]), // array = etiqueta de 2 líneas en Chart.js
       datasets: [{
         label: '% Certificación',
-        data: pcEntries.map(e => e[1]),
-        borderColor: '#D97706',
-        backgroundColor: '#D97706',
-        tension: 0.3,
-        pointRadius: 4,
-        pointBackgroundColor: '#D97706'
+        data: pctGraficarPC,
+        rawData: pctRealPC,
+        backgroundColor: colorPorPC,
+        borderRadius: 4,
+        barThickness: 16
       }]
     },
-    plugins: [pointLabelPlugin],
+    plugins: [barEndLabelPlugin],
     options: {
+      indexAxis: 'y',
       responsive:true, maintainAspectRatio:false,
       scales:{
-        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
-        y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
+        x:{ beginAtZero:true, max: EJE_MAX_PC, title:{ display:true, text:'% Certificación' } },
+        y:{ ticks:{ font:{ size:11 } } }
       },
-      plugins:{ legend:{ display:false } }
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ callbacks:{ label: (ctx) => (ctx.raw != null ? pctRealPC[ctx.dataIndex].toFixed(1) : '0') + '% de certificación' } }
+      }
     }
   });
 

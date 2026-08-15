@@ -76,6 +76,9 @@
       <button class="nav-btn" data-view="certificaciones">
         <span class="nav-icon">✓</span> Certificaciones
       </button>
+      <button class="nav-btn" data-view="aperturas">
+        <span class="nav-icon">▧</span> Aperturas
+      </button>
       <button class="nav-btn" data-view="vencimientos">
         <span class="nav-icon">▦</span> Vencimientos
       </button>
@@ -165,6 +168,7 @@
       <div class="panel">
         <h3>Adjudicado vs. Certificado por Sucursal — con % de Avance</h3>
         <canvas id="chartAdjCertSucursal" height="130"></canvas>
+        <p class="table-note cert-nota-warning" id="chartAdjCertNota" hidden></p>
       </div>
       <div class="panel">
         <h3>% de Certificación por Pedido de Compras</h3>
@@ -261,6 +265,27 @@
         </div>
         <div class="calendar-grid" id="calendarGrid"></div>
         <div id="calendarDayDetail" class="calendar-day-detail" hidden></div>
+      </div>
+    </section>
+
+    <!-- ---------- APERTURAS ---------- -->
+    <section id="view-aperturas" class="view" hidden>
+      <div class="view-header">
+        <h2>Calendario de Aperturas</h2>
+        <div class="control-inline">
+          <button id="calAperturaPrevBtn" class="btn btn-ghost">‹</button>
+          <span id="calAperturaMonthLabel" class="cal-month-label"></span>
+          <button id="calAperturaNextBtn" class="btn btn-ghost">›</button>
+          <button id="calAperturaTodayBtn" class="btn btn-ghost">Hoy</button>
+        </div>
+      </div>
+      <p class="table-note">Se basa en la Fecha de Apertura de cada trámite, y respeta los filtros que tengas aplicados en el Dashboard. Junto con Vencimientos, muestra los dos extremos de la vida del trámite.</p>
+      <div class="panel">
+        <div class="calendar-weekdays">
+          <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+        </div>
+        <div class="calendar-grid" id="calendarAperturaGrid"></div>
+        <div id="calendarAperturaDayDetail" class="calendar-day-detail" hidden></div>
       </div>
     </section>
 
