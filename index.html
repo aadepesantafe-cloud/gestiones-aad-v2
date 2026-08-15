@@ -67,17 +67,17 @@
       <button class="nav-btn" data-view="registros">
         <span class="nav-icon">▤</span> Registros
       </button>
-      <button class="nav-btn" data-view="vencimientos">
-        <span class="nav-icon">▦</span> Vencimientos
-      </button>
-      <button class="nav-btn" data-view="certificaciones">
-        <span class="nav-icon">✓</span> Certificaciones
+      <button class="nav-btn" data-view="formulario">
+        <span class="nav-icon">＋</span> Nuevo trámite
       </button>
       <button class="nav-btn" data-view="proyectos">
         <span class="nav-icon">◫</span> Proyectos
       </button>
-      <button class="nav-btn" data-view="formulario">
-        <span class="nav-icon">＋</span> Nuevo trámite
+      <button class="nav-btn" data-view="certificaciones">
+        <span class="nav-icon">✓</span> Certificaciones
+      </button>
+      <button class="nav-btn" data-view="vencimientos">
+        <span class="nav-icon">▦</span> Vencimientos
       </button>
       <button class="nav-btn" data-view="usuarios" id="navUsuarios" hidden>
         <span class="nav-icon">◍</span> Usuarios
@@ -310,7 +310,10 @@
       </div>
 
       <div class="panel">
-        <h3>Certificaciones cargadas</h3>
+        <div class="view-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Certificaciones cargadas</h3>
+          <button id="certExportBtn" class="btn btn-secondary">Exportar a Excel</button>
+        </div>
         <div class="filters-bar">
           <div class="filter-field">
             <label>Buscar</label>
@@ -365,7 +368,10 @@
       </div>
 
       <div class="panel">
-        <h3>Proyectos cargados</h3>
+        <div class="view-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Proyectos cargados</h3>
+          <button id="proyExportBtn" class="btn btn-secondary">Exportar a Excel</button>
+        </div>
         <div class="filters-bar">
           <div class="filter-field">
             <label>Buscar</label>

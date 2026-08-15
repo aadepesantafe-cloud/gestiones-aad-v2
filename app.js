@@ -1550,15 +1550,19 @@ function escapeHtml(v) {
 let certTramitePreseleccionado = null; // seteado desde el botón "Ver / cargar certificaciones" del formulario
 let certTramiteActual = null;          // registro del trámite elegido en esta pestaña
 let certListaCache = [];               // todas las certificaciones ya cargadas (para la tabla)
+let certCamposCache = [];              // metadatos de campos (para exportar con etiquetas legibles)
 
 async function abrirVistaCertificaciones() {
   document.getElementById('certFiltroTexto').value = '';
   await cargarCertificaciones();
 
+  const puedeEditar = state.session && state.session.rol !== 'consulta';
+  document.getElementById('certFormPanel').hidden = !puedeEditar;
+
   if (certTramitePreseleccionado) {
     const rec = state.registros.find(r => r._id === certTramitePreseleccionado);
     certTramitePreseleccionado = null;
-    if (rec) seleccionarTramiteParaCertificar(rec);
+    if (rec && puedeEditar) seleccionarTramiteParaCertificar(rec);
   } else {
     document.getElementById('certTramiteSeleccionado').hidden = true;
     document.getElementById('certForm').hidden = true;
@@ -1569,12 +1573,26 @@ async function abrirVistaCertificaciones() {
 async function cargarCertificaciones() {
   try {
     const data = await apiCall('certificaciones_listar');
+    certCamposCache = data.campos;
     certListaCache = data.certificaciones;
     renderCertTable();
   } catch (err) {
     showAppError('No se pudieron cargar las certificaciones: ' + err.message);
   }
 }
+
+document.getElementById('certExportBtn').addEventListener('click', () => {
+  if (!certListaCache.length) { alert('No hay certificaciones para exportar.'); return; }
+  const data = certListaCache.map(c => {
+    const obj = {};
+    certCamposCache.forEach(f => { obj[f.label] = c[f.key]; });
+    return obj;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Certificaciones');
+  XLSX.writeFile(wb, 'certificaciones_export.xlsx');
+});
 
 // ---- Buscador de trámite ----
 const certBuscarInput = document.getElementById('certBuscarTramite');
@@ -1738,15 +1756,19 @@ function renderCertTable() {
 let proyTramitePreseleccionado = null; // seteado desde el botón "Ver / cargar proyectos" del formulario
 let proyTramiteActual = null;          // registro del trámite elegido en esta pestaña
 let proyListaCache = [];               // todos los proyectos ya cargados (para la tabla)
+let proyCamposCache = [];              // metadatos de campos (para exportar con etiquetas legibles)
 
 async function abrirVistaProyectos() {
   document.getElementById('proyFiltroTexto').value = '';
   await cargarProyectos();
 
+  const puedeEditar = state.session && state.session.rol !== 'consulta';
+  document.getElementById('proyFormPanel').hidden = !puedeEditar;
+
   if (proyTramitePreseleccionado) {
     const rec = state.registros.find(r => r._id === proyTramitePreseleccionado);
     proyTramitePreseleccionado = null;
-    if (rec) seleccionarTramiteParaProyecto(rec);
+    if (rec && puedeEditar) seleccionarTramiteParaProyecto(rec);
   } else {
     document.getElementById('proyTramiteSeleccionado').hidden = true;
     document.getElementById('proyForm').hidden = true;
@@ -1757,12 +1779,26 @@ async function abrirVistaProyectos() {
 async function cargarProyectos() {
   try {
     const data = await apiCall('proyectos_listar');
+    proyCamposCache = data.campos;
     proyListaCache = data.proyectos;
     renderProyTable();
   } catch (err) {
     showAppError('No se pudieron cargar los proyectos: ' + err.message);
   }
 }
+
+document.getElementById('proyExportBtn').addEventListener('click', () => {
+  if (!proyListaCache.length) { alert('No hay proyectos para exportar.'); return; }
+  const data = proyListaCache.map(p => {
+    const obj = {};
+    proyCamposCache.forEach(f => { obj[f.label] = p[f.key]; });
+    return obj;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Proyectos');
+  XLSX.writeFile(wb, 'proyectos_export.xlsx');
+});
 
 // ---- Buscador de trámite ----
 const proyBuscarInput = document.getElementById('proyBuscarTramite');
