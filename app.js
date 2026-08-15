@@ -1002,7 +1002,7 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let chartMontos, chartAdjCertSucursal, chartCertificacion, chartCertificacionPC;
+let chartMontos, chartAdjCertSucursal, chartCertificacionPC;
 
 document.getElementById('dashGroupBy').addEventListener('change', renderDashboard);
 
@@ -1065,10 +1065,10 @@ function renderDashboard() {
     kpiCard('Trámites (filtro actual)', rows.length, 'de ' + state.registros.length + ' totales'),
     kpiCard('Presupuesto oficial total', formatMillions(totalPresOficial), 'sin IVA'),
     kpiCard('Total adjudicado', formatMillions(totalAdjudicado), 'sin IVA'),
-    kpiCard('Certificado por AAD', formatMillions(totalCertificado), 'IVA incluido'),
+    kpiCard('Certificado por AAD', formatMillions(totalCertificado), 'sin IVA'),
     kpiCard('% Ejecución', pctEjecucion.toFixed(1) + '%', 'certificado / adjudicado'),
     kpiCard('Desvío presupuestario', (desvioPresupuestario >= 0 ? '+' : '') + desvioPresupuestario.toFixed(1) + '%', desvioPresupuestario >= 0 ? 'por encima del oficial' : 'por debajo del oficial'),
-    kpiCard('Multas acumuladas', formatMillions(totalMultas), 'IVA incluido'),
+    kpiCard('Multas acumuladas', formatMillions(totalMultas), 'sin IVA'),
   ].join('');
 
 
@@ -1140,52 +1140,7 @@ function renderDashboard() {
     }
   });
 
-  // ---- Gráfico 2: % de Certificación por Sucursal + Contratista (curva) ----
-  const byCombo = {};
-  rows.forEach(r => {
-    if (!r.adjudicatario) return;
-    const key = (r.sucursal || '(sin sucursal)').trim() + ' · ' + r.adjudicatario.trim();
-    if (!byCombo[key]) byCombo[key] = { adjudicado:0, certificado:0 };
-    byCombo[key].adjudicado += num(r.totalAdjudicado);
-    byCombo[key].certificado += num(r.certificadosAAD);
-  });
-  const comboEntries = Object.entries(byCombo)
-    .map(([k, v]) => [k, v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0])
-    .sort((a,b) => b[1] - a[1])
-    .slice(0, 15);
-
-  const ctx4 = document.getElementById('chartCertificacion').getContext('2d');
-  if (chartCertificacion) chartCertificacion.destroy();
-  const comboNombresCompletos = comboEntries.map(e => e[0]);
-  chartCertificacion = new Chart(ctx4, {
-    type: 'line',
-    data: {
-      labels: comboEntries.map(e => truncateLabel(e[0], 22)),
-      datasets: [{
-        label: '% Certificación',
-        data: comboEntries.map(e => e[1]),
-        borderColor: '#0D9488',
-        backgroundColor: '#0D9488',
-        tension: 0.3,
-        pointRadius: 4,
-        pointBackgroundColor: '#0D9488'
-      }]
-    },
-    plugins: [pointLabelPlugin],
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      scales:{
-        x:{ ticks:{ autoSkip:false, maxRotation:60, minRotation:30, font:{ size:10 } } },
-        y:{ beginAtZero:true, title:{ display:true, text:'% Certificación' } }
-      },
-      plugins:{
-        legend:{ display:false },
-        tooltip:{ callbacks:{ title: (items) => comboNombresCompletos[items[0].dataIndex] || '' } }
-      }
-    }
-  });
-
-  // ---- Gráfico 3: % de Certificación por Pedido de Compras (curva, otro color) ----
+  // ---- Gráfico: % de Certificación por Pedido de Compras (curva) ----
   const byPC = {};
   rows.forEach(r => {
     if (!r.nroPedidoCompras) return;
@@ -1233,7 +1188,7 @@ function renderDashboard() {
   const groups = {};
   rows.forEach(r => {
     const key = (r[groupKey] || '(sin dato)').toString().trim() || '(sin dato)';
-    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0, certProcesados:0, proyectos:0, pctIIBBValores:[] };
+    if (!groups[key]) groups[key] = { n:0, presOficial:0, adjudicado:0, certificado:0, certProcesados:0, proyectos:0, pctIIBBValores:[], sucursales:new Set(), contratistas:new Set() };
     groups[key].n++;
     groups[key].presOficial += num(r.presupuestoOficialRubro);
     groups[key].adjudicado += num(r.totalAdjudicado);
@@ -1242,12 +1197,19 @@ function renderDashboard() {
     groups[key].proyectos += num(r.cantidadProyectos);
     const pctIIBB = num(r.pctIIBBProyectados);
     if (pctIIBB > 0) groups[key].pctIIBBValores.push(pctIIBB);
+    if (r.sucursal) groups[key].sucursales.add(r.sucursal.trim());
+    if (r.adjudicatario) groups[key].contratistas.add(r.adjudicatario.trim());
   });
   const promedioPctIIBB = (v) => v.pctIIBBValores.length ? v.pctIIBBValores.reduce((a,b) => a+b, 0) / v.pctIIBBValores.length : 0;
+  const listaCorta = (set, max = 3) => {
+    const arr = Array.from(set);
+    return arr.length <= max ? arr.join(', ') : arr.slice(0, max).join(', ') + ' (+' + (arr.length - max) + ')';
+  };
 
   const allEntries = Object.entries(groups).sort((a,b) => b[1].presOficial - a[1].presOficial);
   const entries = allEntries.slice(0, 12);
   const hayMasGrupos = allEntries.length > entries.length;
+  const mostrarSucursalContratista = groupKey === 'nroPedidoCompras';
 
   // Totales sobre TODOS los grupos (no solo los 12 que se muestran), para que coincida con los KPIs de arriba
   const totalGeneral = allEntries.reduce((acc, [, v]) => {
@@ -1258,13 +1220,15 @@ function renderDashboard() {
   const avanceGeneral = totalGeneral.adjudicado > 0 ? (totalGeneral.certificado / totalGeneral.adjudicado) * 100 : 0;
   const promedioPctIIBBGeneral = promedioPctIIBB(totalGeneral);
 
+  const colExtra = mostrarSucursalContratista ? '<th>Sucursal</th><th>Contratista</th>' : '';
   const table = document.getElementById('dashTable');
-  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th><th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th><th>Cant. Certificados Proc.</th><th>Cant. Proyectos</th><th>% IIBB Proyectados</th></tr></thead>' +
+  table.innerHTML = '<thead><tr><th>' + labelForGroup(groupKey) + '</th>' + colExtra + '<th>Trámites</th><th>Pres. Oficial</th><th>Total Adjudicado</th><th>Certificado AAD</th><th>% de Avance</th><th>Cant. Certificados Proc.</th><th>Cant. Proyectos</th><th>% IIBB Proyectados</th></tr></thead>' +
     '<tbody>' + entries.map(([k, v]) => {
       const avanceGrupo = v.adjudicado > 0 ? (v.certificado / v.adjudicado) * 100 : 0;
-      return `<tr><td>${escapeHtml(k)}</td><td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td><td>${v.certProcesados}</td><td>${v.proyectos}</td><td>${promedioPctIIBB(v).toFixed(1)}%</td></tr>`;
+      const tdsExtra = mostrarSucursalContratista ? `<td>${escapeHtml(listaCorta(v.sucursales))}</td><td>${escapeHtml(listaCorta(v.contratistas))}</td>` : '';
+      return `<tr><td>${escapeHtml(k)}</td>${tdsExtra}<td>${v.n}</td><td>${formatMillions(v.presOficial)}</td><td>${formatMillions(v.adjudicado)}</td><td>${formatMillions(v.certificado)}</td><td>${avanceGrupo.toFixed(1)}%</td><td>${v.certProcesados}</td><td>${v.proyectos}</td><td>${promedioPctIIBB(v).toFixed(1)}%</td></tr>`;
     }).join('') +
-    `<tr class="dash-table-total"><td>TOTAL${hayMasGrupos ? ' (' + allEntries.length + ' grupos)' : ''}</td><td>${totalGeneral.n}</td><td>${formatMillions(totalGeneral.presOficial)}</td><td>${formatMillions(totalGeneral.adjudicado)}</td><td>${formatMillions(totalGeneral.certificado)}</td><td>${avanceGeneral.toFixed(1)}%</td><td>${totalGeneral.certProcesados}</td><td>${totalGeneral.proyectos}</td><td>${promedioPctIIBBGeneral.toFixed(1)}%</td></tr>` +
+    `<tr class="dash-table-total"><td>TOTAL${hayMasGrupos ? ' (' + allEntries.length + ' grupos)' : ''}</td>${mostrarSucursalContratista ? '<td></td><td></td>' : ''}<td>${totalGeneral.n}</td><td>${formatMillions(totalGeneral.presOficial)}</td><td>${formatMillions(totalGeneral.adjudicado)}</td><td>${formatMillions(totalGeneral.certificado)}</td><td>${avanceGeneral.toFixed(1)}%</td><td>${totalGeneral.certProcesados}</td><td>${totalGeneral.proyectos}</td><td>${promedioPctIIBBGeneral.toFixed(1)}%</td></tr>` +
     '</tbody>';
 
   const nota = document.getElementById('dashTableNota');
